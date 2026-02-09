@@ -230,6 +230,12 @@ when t.tags like ('%horario_atendimento_ccc%') then 'horario_atendimento_ccc'
 
 ---
 
+## 18. ECOSYSTEM.CLINICS Governance (2026-02-09)
+
+| ID | Topic | Status | Decision | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| 18.1 | Governança de `ECOSYSTEM.CLINICS` | ✅➡️ Executed | **Opção B (estrita)**: contrato canônico mínimo é **SAAS-owned**; FINTECH documenta apenas projeções locais (`FINTECH.CLINICS.*`) | Reduz acoplamento semântico e mantém autonomia. `ECOSYSTEM.CLINICS` deve conter apenas invariantes + join key (`clinic_id`) + caveats cross-domain. |
+
 ## 5. Workflow / Next Steps
 
 | Priority | Action | Owner | Status |
