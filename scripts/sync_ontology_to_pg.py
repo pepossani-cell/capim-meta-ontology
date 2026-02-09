@@ -3,20 +3,55 @@ import json
 import yaml
 import hashlib
 import psycopg2
+import psycopg2.extras
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# DB Configuration
-config = {
-    "host": "n8n-data.cktq8qw4cdda.us-east-1.rds.amazonaws.com",
-    "port": 5432,
-    "database": "vox_popular",
-    "user": "vox_popular_user",
-    "password": "W9y@tN4%mG2s#Q8k!FbZ1rLp"
-}
+def _get_vox_popular_pg_config():
+    """
+    Read vox_popular Postgres credentials from environment variables.
+
+    Expected variables (see .env):
+      - VOX_POPULAR_HOST
+      - VOX_POPULAR_PORT
+      - VOX_POPULAR_DB
+      - VOX_POPULAR_USER
+      - VOX_POPULAR_PASSWORD
+    """
+    host = os.getenv("VOX_POPULAR_HOST")
+    port_raw = os.getenv("VOX_POPULAR_PORT", "5432")
+    database = os.getenv("VOX_POPULAR_DB")
+    user = os.getenv("VOX_POPULAR_USER")
+    password = os.getenv("VOX_POPULAR_PASSWORD")
+
+    missing = [k for k, v in {
+        "VOX_POPULAR_HOST": host,
+        "VOX_POPULAR_DB": database,
+        "VOX_POPULAR_USER": user,
+        "VOX_POPULAR_PASSWORD": password,
+    }.items() if not v]
+
+    try:
+        port = int(port_raw)
+    except ValueError:
+        raise ValueError(f"VOX_POPULAR_PORT inválida: {port_raw!r}")
+
+    if missing:
+        raise RuntimeError(
+            "Variáveis de ambiente ausentes para conexão com vox_popular: "
+            + ", ".join(missing)
+        )
+
+    return {
+        "host": host,
+        "port": port,
+        "database": database,
+        "user": user,
+        "password": password,
+    }
 
 REGISTRY_PATH = "federation/DOMAIN_REGISTRY.yaml"
 
@@ -61,6 +96,20 @@ def get_file_content(path):
     with open(path, 'r', encoding='utf-8') as f:
         return f.read()
 
+def resolve_doc_path(root_path: str, doc_path):
+    """
+    Resolve documentation path.
+
+    - If doc_path is absolute: use as-is
+    - Else: join with root_path (from DOMAIN_REGISTRY)
+    """
+    if not doc_path:
+        return None
+    p = Path(doc_path)
+    if p.is_absolute():
+        return str(p)
+    return os.path.join(root_path, doc_path)
+
 def get_sync_hash(content):
     if not content:
         return ""
@@ -98,10 +147,10 @@ def sync():
     parser.add_argument('--dry-run', action='store_true', help='Simulate sync without DB connection')
     args = parser.parse_args()
 
-    print(f"🔄 Starting Ontology Synchronization... {'(DRY RUN)' if args.dry_run else ''}")
+    print(f"[SYNC] Starting Ontology Synchronization... {'(DRY RUN)' if args.dry_run else ''}")
     
     if not os.path.exists(REGISTRY_PATH):
-        print(f"❌ Registry not found: {REGISTRY_PATH}")
+        print(f"[ERROR] Registry not found: {REGISTRY_PATH}")
         return
 
     with open(REGISTRY_PATH, 'r', encoding='utf-8') as f:
@@ -112,37 +161,39 @@ def sync():
 
     if not args.dry_run:
         try:
+            config = _get_vox_popular_pg_config()
             conn = psycopg2.connect(**config)
             cursor = conn.cursor()
         except Exception as e:
-            print(f"❌ Database connection failed: {e}")
+            print(f"[ERROR] Database connection failed: {e}")
             return
     else:
-        print("ℹ️  Dry run mode: Skipping database connection.")
+        print("[INFO] Dry run mode: Skipping database connection.")
 
     for domain in registry['domains']:
         domain_id = domain['id']
         root_path = domain['root_path']
-        index_rel_path = domain['entity_index']
+        # Prefer ontology_index if present (CLIENT_VOICE), fallback to entity_index
+        index_rel_path = domain.get('ontology_index') or domain.get('entity_index')
+        if not index_rel_path:
+            print(f"[WARN] Skipping {domain_id}: neither ontology_index nor entity_index present in registry")
+            continue
         index_path = os.path.join(root_path, index_rel_path)
 
         if not os.path.exists(index_path):
-            print(f"⚠️ Skipping {domain_id}: Index not found at {index_path}")
+            print(f"[WARN] Skipping {domain_id}: Index not found at {index_path}")
             continue
 
-        print(f"📂 Processing domain: {domain_id}")
+        print(f"[DOMAIN] Processing domain: {domain_id}")
         with open(index_path, 'r', encoding='utf-8') as f:
             index = yaml.safe_load(f)
 
         for entity in index['entities']:
             qualified_name = entity['id']
-            print(f"   📄 Syncing: {qualified_name}")
+            print(f"   [ENTITY] Syncing: {qualified_name}")
             
-            # Resolve paths relative to index location
-            index_dir = os.path.dirname(index_path)
-            
-            sem_path = os.path.join(root_path, entity['semantic_doc']) if entity.get('semantic_doc') else None
-            age_path = os.path.join(root_path, entity['agentic_doc']) if entity.get('agentic_doc') else None
+            sem_path = resolve_doc_path(root_path, entity.get('semantic_doc'))
+            age_path = resolve_doc_path(root_path, entity.get('agentic_doc'))
             
             sem_content = get_file_content(sem_path)
             age_content = get_file_content(age_path)
@@ -164,9 +215,9 @@ def sync():
                 "tier": entity['tier'],
                 "semantic_markdown": sem_content,
                 "agentic_markdown": age_content,
-                "axioms_json": json.dumps(axioms),
+                "axioms_json": psycopg2.extras.Json(axioms),
                 "status": entity.get('status', 'ACTIVE'),
-                "metadata": json.dumps({
+                "metadata": psycopg2.extras.Json({
                     "source_domain": domain_id,
                     "tier": entity['tier'],
                     "original_paths": {
@@ -181,7 +232,7 @@ def sync():
             }
 
             if args.dry_run:
-                print(f"      ✅ [DRY RUN] Prepared data for {qualified_name}")
+                print(f"      [OK] [DRY RUN] Prepared data for {qualified_name}")
                 print(f"      - Axioms: {len(axioms)}")
                 print(f"      - Hash: {sync_hash}")
                 continue
@@ -204,29 +255,33 @@ def sync():
                         semantic_markdown = CASE 
                             WHEN public.ontology_entities.qualified_name LIKE 'ECOSYSTEM.%%' 
                             AND public.ontology_entities.semantic_markdown NOT LIKE '%%' || EXCLUDED.semantic_markdown || '%%'
-                            THEN public.ontology_entities.semantic_markdown || '\n\n--- [Merged from ' || EXCLUDED.metadata->>'source_domain' || '] ---\n\n' || EXCLUDED.semantic_markdown
+                            THEN public.ontology_entities.semantic_markdown
+                              || '\n\n--- [Merged from '
+                              || COALESCE((EXCLUDED.metadata::jsonb)->>'source_domain', 'unknown')
+                              || '] ---\n\n'
+                              || EXCLUDED.semantic_markdown
                             ELSE EXCLUDED.semantic_markdown 
                         END,
                         agentic_markdown = EXCLUDED.agentic_markdown,
-                        axioms_json = public.ontology_entities.axioms_json || EXCLUDED.axioms_json,
+                        axioms_json = (public.ontology_entities.axioms_json::jsonb) || (EXCLUDED.axioms_json::jsonb),
                         status = EXCLUDED.status,
-                        metadata = public.ontology_entities.metadata || EXCLUDED.metadata,
+                        metadata = (public.ontology_entities.metadata::jsonb) || (EXCLUDED.metadata::jsonb),
                         sync_hash = EXCLUDED.sync_hash,
                         updated_at = EXCLUDED.updated_at,
                         synced_at = EXCLUDED.synced_at
                     WHERE public.ontology_entities.sync_hash IS DISTINCT FROM EXCLUDED.sync_hash OR public.ontology_entities.qualified_name LIKE 'ECOSYSTEM.%%';
                 """, data)
             except Exception as e:
-                print(f"      ❌ Error syncing {qualified_name}: {e}")
+                print(f"      [ERROR] Error syncing {qualified_name}: {e}")
                 conn.rollback()
 
     if not args.dry_run and conn:
         conn.commit()
         cursor.close()
         conn.close()
-        print("✅ Synchronization complete!")
+        print("[OK] Synchronization complete!")
     elif args.dry_run:
-        print("✅ Dry run complete!")
+        print("[OK] Dry run complete!")
 
 if __name__ == "__main__":
     sync()

@@ -23,3 +23,24 @@ CREATE INDEX IF NOT EXISTS idx_ontology_entities_domains ON public.ontology_enti
 
 -- Comment for clarity
 COMMENT ON TABLE public.ontology_entities IS 'Central storage for ecosystem entities documentation and rules.';
+
+-- --- Compatibility migrations (older schema versions) ---
+-- Some early versions stored JSON as TEXT. Normalize to JSONB safely.
+
+ALTER TABLE public.ontology_entities
+  ALTER COLUMN metadata TYPE JSONB
+  USING (
+    CASE
+      WHEN metadata IS NULL OR metadata::text = '' THEN '{}'::jsonb
+      ELSE metadata::jsonb
+    END
+  );
+
+ALTER TABLE public.ontology_entities
+  ALTER COLUMN axioms_json TYPE JSONB
+  USING (
+    CASE
+      WHEN axioms_json IS NULL OR axioms_json::text = '' THEN '[]'::jsonb
+      ELSE axioms_json::jsonb
+    END
+  );

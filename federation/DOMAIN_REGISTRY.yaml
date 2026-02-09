@@ -32,7 +32,7 @@ domains:
     docs_path: "c:/Users/pedro.possani_capim/client-voice-data/_domain/_docs"
     governance: "c:/Users/pedro.possani_capim/capim-meta-ontology/MEMORY_ARCHITECTURE_CONSTITUTION.md"
     entry_point: "START_HERE.md"
-    entity_index: "_docs/ENTITY_INDEX.yaml"
+    entity_index: "_docs/ONTOLOGY_INDEX.yaml"
     ontology_index: "_docs/ONTOLOGY_INDEX.yaml"
     graph: null  # Not yet implemented
     status: ACTIVE

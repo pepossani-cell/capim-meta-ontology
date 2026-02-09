@@ -8,16 +8,39 @@ import psycopg2
 # Load environment variables
 load_dotenv()
 
-# VOX POPULAR (Client Voice) Configuration
-config = {
-    "host": "n8n-data.cktq8qw4cdda.us-east-1.rds.amazonaws.com",
-    "port": 5432,
-    "database": "vox_popular",
-    "user": "vox_popular_user",
-    "password": "W9y@tN4%mG2s#Q8k!FbZ1rLp"
-}
+def _get_vox_popular_pg_config():
+    host = os.getenv("VOX_POPULAR_HOST")
+    port_raw = os.getenv("VOX_POPULAR_PORT", "5432")
+    database = os.getenv("VOX_POPULAR_DB")
+    user = os.getenv("VOX_POPULAR_USER")
+    password = os.getenv("VOX_POPULAR_PASSWORD")
 
-print("🔌 Testing PostgreSQL connection...")
+    missing = [k for k, v in {
+        "VOX_POPULAR_HOST": host,
+        "VOX_POPULAR_DB": database,
+        "VOX_POPULAR_USER": user,
+        "VOX_POPULAR_PASSWORD": password,
+    }.items() if not v]
+
+    try:
+        port = int(port_raw)
+    except ValueError:
+        raise ValueError(f"VOX_POPULAR_PORT inválida: {port_raw!r}")
+
+    if missing:
+        raise RuntimeError("Variáveis ausentes: " + ", ".join(missing))
+
+    return {
+        "host": host,
+        "port": port,
+        "database": database,
+        "user": user,
+        "password": password,
+    }
+
+config = _get_vox_popular_pg_config()
+
+print("[PG] Testing PostgreSQL connection...")
 print(f"   Host: {config['host']}")
 print(f"   Database: {config['database']}")
 print(f"   User: {config['user']}")
@@ -32,7 +55,7 @@ try:
         connect_timeout=10
     )
     
-    print("✅ Connection successful!")
+    print("[OK] Connection successful!")
     
     # Test query - list tables
     cursor = conn.cursor()
@@ -44,15 +67,15 @@ try:
     """)
     
     tables = cursor.fetchall()
-    print(f"\n📋 Tables in vox_popular ({len(tables)} found):")
+    print(f"\n[PG] Tables in vox_popular ({len(tables)} found):")
     for table in tables:
         print(f"   - {table[0]}")
     
     cursor.close()
     conn.close()
-    print("\n✅ Test completed successfully!")
+    print("\n[OK] Test completed successfully!")
     
 except psycopg2.OperationalError as e:
-    print(f"❌ Connection failed: {e}")
+    print(f"[ERROR] Connection failed: {e}")
 except Exception as e:
-    print(f"❌ Error: {e}")
+    print(f"[ERROR] Error: {e}")
