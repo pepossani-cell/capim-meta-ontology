@@ -37,11 +37,75 @@ def _get_vox_popular_pg_config():
 def check():
     conn = psycopg2.connect(**_get_vox_popular_pg_config())
     cursor = conn.cursor()
-    cursor.execute("SELECT qualified_name, domains, tier, status FROM public.ontology_entities;")
+
+    cursor.execute(
+        """
+        SELECT qualified_name, domains, tier, status
+        FROM public.ontology_entities
+        ORDER BY qualified_name;
+        """
+    )
     rows = cursor.fetchall()
     print(f"[CHECK] Rows in ontology_entities: {len(rows)}")
     for row in rows:
         print(f"   - {row[0]} | Domains: {row[1]} | Tier: {row[2]} | Status: {row[3]}")
+
+    cursor.execute(
+        """
+        SELECT
+          qualified_name,
+          domains,
+          tier,
+          status,
+          COALESCE(metadata->>'source_domain', 'unknown') AS source_domain,
+          COALESCE(metadata->'original_paths'->>'semantic', '') AS semantic_path,
+          COALESCE(metadata->'original_paths'->>'agentic', '') AS agentic_path,
+          (semantic_markdown IS NULL OR LENGTH(TRIM(semantic_markdown)) = 0) AS missing_semantic,
+          (agentic_markdown IS NULL OR LENGTH(TRIM(agentic_markdown)) = 0) AS missing_agentic
+        FROM public.ontology_entities
+        WHERE
+          (semantic_markdown IS NULL OR LENGTH(TRIM(semantic_markdown)) = 0)
+          OR (agentic_markdown IS NULL OR LENGTH(TRIM(agentic_markdown)) = 0)
+        ORDER BY qualified_name;
+        """
+    )
+    missing = cursor.fetchall()
+
+    if not missing:
+        print("[CHECK] OK: todas as entidades possuem semantic_markdown e agentic_markdown não vazios.")
+    else:
+        missing_semantic_only = []
+        missing_agentic_only = []
+        missing_both = []
+
+        for qualified_name, domains, tier, status, source_domain, sem_path, age_path, ms, ma in missing:
+            item = (qualified_name, domains, tier, status, source_domain, sem_path, age_path)
+            if ms and ma:
+                missing_both.append(item)
+            elif ms:
+                missing_semantic_only.append(item)
+            elif ma:
+                missing_agentic_only.append(item)
+
+        print(f"[CHECK] ATENÇÃO: entidades com docs faltando: {len(missing)}")
+        if missing_both:
+            print(f"[CHECK] - Sem SEMANTIC e AGENTIC: {len(missing_both)}")
+            for qualified_name, domains, tier, status, source_domain, sem_path, age_path in missing_both:
+                print(f"   - {qualified_name} | DomainSrc: {source_domain} | Domains: {domains} | Tier: {tier} | Status: {status}")
+                print(f"     semantic_path: {sem_path or '<empty>'}")
+                print(f"     agentic_path:  {age_path or '<empty>'}")
+        if missing_semantic_only:
+            print(f"[CHECK] - Sem SEMANTIC: {len(missing_semantic_only)}")
+            for qualified_name, domains, tier, status, source_domain, sem_path, age_path in missing_semantic_only:
+                print(f"   - {qualified_name} | DomainSrc: {source_domain} | Domains: {domains} | Tier: {tier} | Status: {status}")
+                print(f"     semantic_path: {sem_path or '<empty>'}")
+                print(f"     agentic_path:  {age_path or '<empty>'}")
+        if missing_agentic_only:
+            print(f"[CHECK] - Sem AGENTIC: {len(missing_agentic_only)}")
+            for qualified_name, domains, tier, status, source_domain, sem_path, age_path in missing_agentic_only:
+                print(f"   - {qualified_name} | DomainSrc: {source_domain} | Domains: {domains} | Tier: {tier} | Status: {status}")
+                print(f"     semantic_path: {sem_path or '<empty>'}")
+                print(f"     agentic_path:  {age_path or '<empty>'}")
     cursor.close()
     conn.close()
 
