@@ -1,0 +1,6 @@
+_scratch/
+
+# secrets / local env
+.env
+.env.*
+

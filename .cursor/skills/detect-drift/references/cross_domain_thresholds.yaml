@@ -1,0 +1,255 @@
+# Cross-Domain Drift Thresholds
+# Purpose: Define tolerances for cross-domain consistency checks
+# Scope: Federation layer (SAAS ↔ FINTECH ↔ CLIENT_VOICE)
+# Last Updated: 2026-02-04
+
+---
+
+# Entity Presence Checks
+# Rule: If entity exists in domain A, should it exist in domain B?
+
+entity_presence:
+
+  clinic_id:
+    description: "Clinic must exist in SAAS if exists in any other domain"
+    axiom_type: HARD  # Zero tolerance
+    tolerance: 0%
+    domains:
+      - source: FINTECH
+        target: SAAS
+        direction: source_must_exist_in_target
+        table_source: credit_simulations
+        table_target: clinics
+        join_key: clinic_id
+        
+      - source: CLIENT_VOICE
+        target: SAAS
+        direction: source_must_exist_in_target
+        table_source: tickets
+        table_target: clinics
+        join_key: clinic_id
+        
+    check_frequency: daily
+    alert_channel: "#data-quality"
+    escalation: immediate
+    
+  patient_cpf:
+    description: "Patient CPF linkage (via clinic_id, not direct)"
+    axiom_type: SOFT  # May have exceptions
+    tolerance: 5%
+    note: "Some CPFs may exist in FINTECH without SAAS if clinic was deleted"
+    domains:
+      - source: FINTECH
+        target: SAAS
+        direction: informational  # Don't enforce, just monitor
+        
+    check_frequency: weekly
+    escalation: investigate_if_above_threshold
+
+---
+
+# Metric Consistency Checks
+# Rule: Same metric calculated across domains should be within tolerance
+
+metric_consistency:
+
+  active_clinic_count:
+    description: "Count of active clinics should be similar across domains"
+    tolerance: 10%
+    note: "Some variance expected due to different activity definitions"
+    
+    calculations:
+      SAAS:
+        query: "SELECT COUNT(DISTINCT id) FROM clinics WHERE status = 'active'"
+        
+      FINTECH:
+        query: |
+          SELECT COUNT(DISTINCT clinic_id) 
+          FROM credit_simulations 
+          WHERE created_at >= DATEADD(month, -3, CURRENT_DATE)
+        note: "Active = had simulation in last 3 months"
+        
+      CLIENT_VOICE:
+        query: |
+          SELECT COUNT(DISTINCT clinic_id)
+          FROM tickets
+          WHERE created_at >= DATEADD(month, -3, CURRENT_DATE)
+        note: "Active = had ticket in last 3 months"
+        
+    check_frequency: weekly
+    
+  monthly_volume:
+    description: "Transaction/activity volume by month"
+    tolerance: 15%
+    note: "Higher tolerance due to different event types"
+    
+    check_frequency: monthly
+    
+  clinic_tier_distribution:
+    description: "Distribution of clinics across tiers"
+    tolerance: 5%
+    note: "Tier definitions should be canonical across domains"
+    
+    reference: "_domain/_docs/reference/CLINIC_TIERS.md"
+    check_frequency: monthly
+
+---
+
+# Temporal Consistency Checks
+# Rule: Events should follow expected temporal order
+
+temporal_consistency:
+
+  event_order:
+    description: "Cross-domain events should respect causal order"
+    tolerance: 1 day  # Buffer for timezone/batch processing
+    
+    rules:
+      - name: "Clinic creation before first simulation"
+        domain_a: SAAS
+        domain_b: FINTECH
+        event_a: clinics.created_at
+        event_b: credit_simulations.created_at
+        expected: event_a <= event_b
+        tolerance_days: 1
+        
+      - name: "Clinic creation before first ticket"
+        domain_a: SAAS
+        domain_b: CLIENT_VOICE
+        event_a: clinics.created_at
+        event_b: tickets.created_at
+        expected: event_a <= event_b
+        tolerance_days: 1
+        
+    check_frequency: weekly
+    note: "Violations may indicate backfill or timezone issues"
+    
+  timestamp_freshness:
+    description: "Data should be recent across all domains"
+    max_lag_hours: 24
+    
+    checks:
+      - domain: SAAS
+        table: clinics
+        timestamp_field: updated_at
+        
+      - domain: FINTECH
+        table: credit_simulations
+        timestamp_field: created_at
+        
+      - domain: CLIENT_VOICE
+        table: tickets
+        timestamp_field: created_at
+        
+    check_frequency: daily
+    alert_if_stale: true
+
+---
+
+# Semantic Consistency Checks
+# Rule: Same field should have same meaning across domains
+
+semantic_consistency:
+
+  status_field:
+    description: "Status values should map correctly"
+    
+    mappings:
+      clinic_status:
+        SAAS: [active, inactive, suspended, cancelled]
+        FINTECH: [eligible, ineligible, blocked]  # Different concept
+        CLIENT_VOICE: null  # No status field
+        
+    note: "Domains have different status concepts - document mapping, don't enforce"
+    
+  currency:
+    description: "All monetary values should be in BRL"
+    check: "No conversion needed - all domains use BRL"
+    tolerance: 0%  # Hard rule
+    
+  timezone:
+    description: "All timestamps should be normalizable to BRT"
+    
+    domain_timezones:
+      SAAS: UTC
+      FINTECH: UTC
+      CLIENT_VOICE: America/Sao_Paulo  # Zendesk already in BRT
+      
+    normalization: "Convert all to BRT for cross-domain analysis"
+    
+---
+
+# Alerting Rules
+
+alerting:
+
+  severity_levels:
+    critical:
+      description: "Hard axiom violated, data integrity at risk"
+      response_time: immediate
+      channel: "#data-quality-critical"
+      pager: true
+      
+    high:
+      description: "Significant drift, may impact analyses"
+      response_time: same_day
+      channel: "#data-quality"
+      pager: false
+      
+    medium:
+      description: "Notable drift, investigate within week"
+      response_time: 1_week
+      channel: "#data-quality"
+      
+    low:
+      description: "Minor drift, monitor trend"
+      response_time: monthly_review
+      channel: null  # Log only
+      
+  escalation_matrix:
+    entity_presence_hard: critical
+    entity_presence_soft: medium
+    metric_consistency_above_20pct: high
+    metric_consistency_10_to_20pct: medium
+    metric_consistency_below_10pct: low
+    temporal_order_violation: medium
+    staleness_above_24h: high
+
+---
+
+# Audit Query Templates
+
+audit_templates:
+
+  entity_presence:
+    template: |
+      -- Audit: {name}
+      -- Axiom: {axiom_type}
+      -- Tolerance: {tolerance}
+      
+      SELECT 
+        '{source_domain}' as source_domain,
+        '{target_domain}' as target_domain,
+        COUNT(*) as drift_count,
+        CASE WHEN COUNT(*) > 0 THEN 'DRIFT' ELSE 'OK' END as status
+      FROM {source_schema}.{source_table} s
+      LEFT JOIN {target_schema}.{target_table} t 
+        ON s.{join_key} = t.{join_key}
+      WHERE t.{join_key} IS NULL;
+      
+  metric_consistency:
+    template: |
+      -- Audit: {name}
+      -- Tolerance: {tolerance}
+      
+      WITH metrics AS (
+        {domain_queries}
+      )
+      SELECT 
+        *,
+        ABS(value - AVG(value) OVER ()) / NULLIF(AVG(value) OVER (), 0) as pct_deviation,
+        CASE 
+          WHEN pct_deviation > {tolerance_decimal} THEN 'DRIFT'
+          ELSE 'OK'
+        END as status
+      FROM metrics;

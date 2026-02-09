@@ -1,0 +1,24 @@
+# REVIEW_QUEUE.yaml
+# Queue of ontology changes pending human review
+# Reference: MEMORY_ARCHITECTURE_CONSTITUTION §RULE:ONTOLOGY_MAINTENANCE
+# Last Updated: 2026-01-31
+
+pending_reviews: []
+
+# Example entry format:
+# - id: REV-001
+#   type: [NEW_ENTITY, NEW_AXIOM, NEW_RULE, MODIFICATION, DEPRECATION]
+#   target: "TAXONOMY.yaml / AXIOMS.yaml / INFERENCE_RULES.yaml"
+#   proposed_by: "Agent Session ID or Human"
+#   proposed_at: "2026-01-31T12:00:00Z"
+#   summary: "Brief description of the change"
+#   diff: |
+#     + Added: ...
+#     - Removed: ...
+#   status: [PENDING, UNDER_REVIEW, APPROVED, REJECTED]
+#   reviewer: null
+#   reviewed_at: null
+#   notes: ""
+
+# History of completed reviews:
+completed_reviews: []

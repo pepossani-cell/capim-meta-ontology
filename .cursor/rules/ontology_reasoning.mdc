@@ -1,0 +1,264 @@
+---
+description: Ontology-driven reasoning for cross-domain queries and entity relationships
+globs: ["_ontology/**/*.yaml", "_federation/**/*.yaml"]
+alwaysApply: true
+---
+
+# Ontology-Driven Reasoning Protocol
+
+## 🎯 PRIMARY PRINCIPLE: FORMAL REASONING
+
+When answering queries about entities or cross-domain relationships, follow the ontology-driven approach defined in this workspace.
+
+**Never guess**. **Always validate** against axioms before responding.
+
+## 1. Query Routing (CAPABILITY_MATRIX)
+
+**Before answering any query**, check the capability matrix to understand what each domain can answer:
+
+**Location**: `_federation/CAPABILITY_MATRIX.yaml`
+
+**Process**:
+1. Parse user query to identify intent
+2. Check which domain(s) can answer
+3. Route to appropriate domain's data sources
+4. If multi-domain, apply cross-domain glue rules
+
+**Example routing**:
+- "What are the problems with clinic X?" → Multi-domain (SAAS + FINTECH + CLIENT_VOICE)
+- "Show me credit simulations for clinic X" → Single domain (FINTECH)
+- "What are active clinics?" → Single domain (SAAS)
+
+## 2. Loading Axioms
+
+**Before making claims**, load relevant axioms from:
+
+**Location**: `_ontology/AXIOMS.yaml`
+
+**Axiom types**:
+- **HARD**: Must never be violated (data integrity)
+- **SOFT**: Should hold, but exceptions exist (business rules)
+- **TEMPORAL**: Time-based constraints
+
+**Usage**:
+```python
+# When making a claim about entity relationships
+# 1. Load axiom
+# 2. Validate claim against axiom
+# 3. If violation detected, either:
+#    - Revise claim
+#    - Document exception
+#    - Flag data integrity issue
+```
+
+## 3. Applying Inference Rules
+
+For complex queries, use predefined reasoning patterns:
+
+**Location**: `_ontology/INFERENCE_RULES.yaml`
+
+**Key rules**:
+- **RULE-CROSS-001**: Clinic Health Diagnostic (multi-domain synthesis)
+- **RULE-CROSS-002**: Patient Journey Reconstruction
+- **RULE-ENTITY-001**: Entity resolution across domains
+
+**When to apply**:
+- User asks complex analytical questions
+- Query requires synthesis from multiple domains
+- Pattern matching common analysis types
+
+## 4. Critical Rules for Cross-Domain Reasoning
+
+### 4.1. ID Matching
+
+**NEVER assume IDs match** across domains, **EXCEPT**:
+- `clinic_id` (universal identifier)
+- `CPF` (patient identifier, use with care for PII)
+
+**For other IDs**:
+- Use `_federation/CROSS_DOMAIN_GLUE.yaml` for join rules
+- Document linkage strategy
+- Use time windows for fuzzy matching
+
+### 4.2. Temporal Reasoning
+
+**Time is fuzzy** in distributed systems:
+- Events propagate asynchronously
+- Use **time windows** when linking cross-domain events
+- Document timezone assumptions (prefer BRT)
+
+**Example**:
+```sql
+-- Bad: Exact timestamp match
+FROM saas_events se
+JOIN fintech_events fe ON se.clinic_id = fe.clinic_id 
+  AND se.timestamp = fe.timestamp
+
+-- Good: Time window match
+FROM saas_events se
+JOIN fintech_events fe ON se.clinic_id = fe.clinic_id 
+  AND fe.timestamp BETWEEN se.timestamp - INTERVAL '5 minutes' 
+                       AND se.timestamp + INTERVAL '5 minutes'
+```
+
+### 4.3. Validation Protocol
+
+**Before returning any response** about entities or relationships:
+
+1. **Check axioms**: Does response violate any HARD axioms?
+2. **Cite sources**: Reference specific tables/docs/memories
+3. **State confidence**: If uncertain, say so
+4. **Document caveats**: Known limitations or exceptions
+
+## 5. Response Contract
+
+When answering ontology-related queries, always include:
+
+```markdown
+**Answer**: [Your response]
+
+**Sources**: 
+- [Table/View/Doc reference 1]
+- [Table/View/Doc reference 2]
+
+**Confidence**: [High/Medium/Low]
+- High: Validated against data + axioms
+- Medium: Based on documented patterns, not verified
+- Low: Inference with assumptions
+
+**Caveats**: 
+- [Known limitation 1]
+- [Known limitation 2]
+```
+
+## 6. Abstention Rule
+
+**If confidence < 0.4**, return:
+
+```markdown
+**I don't have enough information to answer this confidently.**
+
+**What I know**:
+- [Partial information]
+
+**What I need**:
+- [Missing data/context]
+
+**Suggested approach**:
+- [How to get the information]
+```
+
+**Don't guess**. Better to abstain than to provide incorrect information.
+
+## 7. Taxonomy Traversal
+
+For IS_A reasoning, use the taxonomy:
+
+**Location**: `_ontology/TAXONOMY.yaml`
+
+**Hierarchical structure**:
+```yaml
+Classes:
+  Entity:
+    subclasses: [Person, Organization, Event]
+  Person:
+    subclasses: [Patient, Clinician, Admin]
+```
+
+**Usage**:
+- When user asks "show me all X", check if X is a class with subclasses
+- Apply inheritance rules (e.g., Patient IS_A Person IS_A Entity)
+- Use for query expansion
+
+## 8. Integration with Federation Layer
+
+**Domain registry**: `_federation/DOMAIN_REGISTRY.yaml`
+
+Maps domain IDs to physical paths:
+```yaml
+FINTECH:
+  path: "../bnpl-funil/_domain/"
+  entry: "START_HERE.md"
+
+SAAS:
+  path: "../ontologia-saas/_domain/"
+  entry: "START_HERE.md"
+```
+
+**Cross-domain glue**: `_federation/CROSS_DOMAIN_GLUE.yaml`
+
+Defines join rules between domains:
+```yaml
+- name: "Patient across SAAS and FINTECH"
+  left_domain: SAAS
+  right_domain: FINTECH
+  join_on: CPF
+  match_type: EXACT
+```
+
+## 9. Skills Integration
+
+This protocol is enforced by:
+- `@clinic-health-check` skill (uses RULE-CROSS-001)
+- `@validate-axioms` skill (validates data against axioms)
+- All cross-domain queries in the workspace
+
+## 10. Example Workflow
+
+**User query**: "What are the problems with clinic 12345?"
+
+**Agent workflow**:
+
+1. **Parse**: Extract `clinic_id = 12345`, intent = "problems/issues"
+
+2. **Route**: Check `CAPABILITY_MATRIX.yaml`
+   - CLIENT_VOICE: Support tickets → YES
+   - SAAS: Operational metrics → YES
+   - FINTECH: Credit health → YES
+   - **Conclusion**: Multi-domain query, use RULE-CROSS-001
+
+3. **Execute**:
+   ```sql
+   -- CLIENT_VOICE: Support health
+   SELECT COUNT(*), AVG(sentiment_score) 
+   FROM tickets 
+   WHERE clinic_id = 12345 AND event_date >= CURRENT_DATE - 90
+
+   -- SAAS: Operational health
+   SELECT COUNT(*), cancellation_rate 
+   FROM appointments 
+   WHERE clinic_id = 12345 AND created_at >= CURRENT_DATE - 90
+
+   -- FINTECH: Credit health
+   SELECT COUNT(*), rejection_rate 
+   FROM credit_simulations 
+   WHERE clinic_id = 12345 AND created_at >= CURRENT_DATE - 90
+   ```
+
+4. **Synthesize**: Apply inference rules from RULE-CROSS-001
+   - If ticket_count > 5 AND sentiment < 2.5 → SUPPORT_CRISIS
+   - If cancellation_rate > 30% → OPERATIONAL_ISSUE
+   - If rejection_rate > 50% → CREDIT_ISSUE
+
+5. **Validate**: Check response against axioms
+   - AX-CROSS-001: Clinic must exist in all domains → Verify
+   - AX-FINTECH-003: Rejection rate in [0,1] → Verify
+
+6. **Respond**: Follow response contract (answer + sources + confidence + caveats)
+
+## 11. Anti-Patterns
+
+❌ **Don't**:
+- Assume IDs match without checking
+- Ignore time zones in temporal queries
+- Skip axiom validation
+- Return responses without sources
+- Guess when uncertain
+
+✅ **Do**:
+- Use capability matrix for routing
+- Apply cross-domain glue rules
+- Validate against axioms
+- Cite sources explicitly
+- Abstain when confidence is low
+- Document caveats and limitations

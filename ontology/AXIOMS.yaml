@@ -1,0 +1,149 @@
+# AXIOMS.yaml
+# Logical constraints that MUST hold within the Capim Ecosystem
+# Reference: MEMORY_ARCHITECTURE_CONSTITUTION §DIRECTIVE:ONTOLOGY_FORMALIZATION
+# Last Updated: 2026-01-31
+
+axioms:
+
+  # === FINTECH DOMAIN ===
+
+  - id: AX-FINTECH-001
+    domain: FINTECH
+    natural_language: "A simulation can only be approved if the clinic is BNPL eligible."
+    formal: "APPROVED(sim) => BNPL_ELIGIBLE(sim.clinic_id)"
+    severity: HARD
+    validation_query: |
+      SELECT COUNT(*) AS violations
+      FROM CAPIM_DATA_DEV.POSSANI_SANDBOX.C1_ENRICHED_BORROWER eb
+      JOIN CAPIM_DATA_DEV.POSSANI_SANDBOX.CLINIC_DIM_V1 cd
+        ON eb.clinic_id = cd.clinic_id
+      WHERE eb.c1_outcome_bucket = 'approved'
+        AND cd.clinic_is_bnpl_eligible = FALSE
+      -- Expected: 0
+    status: HOMOLOGATED
+    last_validated: null
+
+  - id: AX-FINTECH-002
+    domain: FINTECH
+    natural_language: "A Request (C2) must have a valid C1 origin OR be explicitly marked as orphan."
+    formal: "REQUEST(r) => (HAS_C1_ORIGIN(r) OR IS_ORPHAN(r))"
+    severity: HARD
+    validation_query: |
+      SELECT COUNT(*) AS violations
+      FROM CAPIM_DATA_DEV.POSSANI_SANDBOX.C2_ENRICHED_REQUESTS
+      WHERE c1_origin_type IS NULL
+        AND c1_is_orphan = FALSE
+      -- Expected: 0
+    status: HOMOLOGATED
+    last_validated: null
+
+  - id: AX-FINTECH-003
+    domain: FINTECH
+    natural_language: "Bureau checks must be associated with C1 events via the Bridge logic, not direct FK."
+    formal: "JOIN(C1, BUREAU) => VIA_BRIDGE(C1, BUREAU)"
+    severity: SOFT
+    validation_query: null  # Enforced by code review, not data
+    status: HOMOLOGATED
+    last_validated: null
+
+  - id: AX-FINTECH-004
+    domain: FINTECH
+    natural_language: "SCR check association uses a +/- 15 day time window."
+    formal: "SCR_MATCH(c1, scr) => ABS(c1.created_at - scr.checked_at) <= 15 days"
+    severity: HARD
+    validation_query: |
+      -- This is a design constraint, not a data validation
+      -- Implement in the Bridge view itself
+    status: HOMOLOGATED
+    last_validated: null
+
+  - id: AX-FINTECH-005
+    domain: FINTECH
+    natural_language: "Risk score special codes (-1, 9) must not be averaged directly."
+    formal: "AVG(risk_score) => EXCLUDE(risk_score IN [-1, 9])"
+    severity: SOFT
+    validation_query: null  # Enforced by using risk_capim_0_5 column
+    status: HOMOLOGATED
+    last_validated: null
+
+  - id: AX-FINTECH-006
+    domain: FINTECH
+    natural_language: "A C1 can only convert to C2 if it was APPROVED. Not all approved C1s convert."
+    formal: "HAS_C2(c1) => WAS_APPROVED(c1)"
+    formal_extended: |
+      # Regra de conversão C1→C2
+      1. HAS_C2(c1) => WAS_APPROVED(c1)              # Necessário mas não suficiente
+      2. WAS_APPROVED(c1) =/=> HAS_C2(c1)            # Nem todo aprovado converte
+      3. WAS_APPROVED(c2) pode ser FALSE mesmo com c1_was_approved=TRUE  # C2 tem avaliação própria
+    severity: HARD
+    validation_query: |
+      -- Valida: nenhum C1 reprovado deve ter C2 associado
+      SELECT COUNT(*) AS violations
+      FROM CAPIM_DATA_DEV.POSSANI_SANDBOX.C1_LIFECYCLE
+      WHERE c1_was_approved = FALSE
+        AND c2_count > 0
+      -- Expected: 0 (ou muito próximo, casos edge)
+    status: HOMOLOGATED
+    last_validated: null
+    notes: |
+      Contexto de negócio:
+      - C1 (Credit Simulation / Pre-Analysis) precisa ser aprovado para gerar proposta
+      - Aprovação em C1 != aprovação em C2 (C2 tem validações adicionais)
+      - Taxa de conversão típica: ~12-15% dos C1 aprovados viram C2
+      - Agente deve entender que "c2_count = 0" para C1 aprovado é ESPERADO, não erro
+
+  # === SAAS DOMAIN ===
+
+  - id: AX-SAAS-001
+    domain: SAAS
+    natural_language: "A clinic is considered churned if no SaaS activity in the last 90 days."
+    formal: "CHURNED(clinic) <=> (NOW() - clinic.last_dash_activity_at) > 90 days"
+    severity: SOFT
+    validation_query: |
+      SELECT clinic_id, 
+             DATEDIFF('day', last_dash_activity_at, CURRENT_DATE()) AS days_inactive
+      FROM CAPIM_DATA_DEV.POSSANI_SANDBOX.CLINIC_MOST_RELEVANT_INFO
+      WHERE is_subscriber = TRUE
+        AND DATEDIFF('day', last_dash_activity_at, CURRENT_DATE()) > 90
+      -- Returns: Candidates for churn review
+    status: HOMOLOGATED
+    last_validated: null
+
+  - id: AX-SAAS-002
+    domain: SAAS
+    natural_language: "has_signed_contract is a BNPL flag, NOT a SaaS subscription indicator."
+    formal: "has_signed_contract(clinic) =/=> is_subscriber(clinic)"
+    severity: HARD
+    validation_query: |
+      -- Semantic constraint; enforced by documentation
+    status: HOMOLOGATED
+    last_validated: null
+
+  # === CROSS-DOMAIN ===
+
+  - id: AX-CROSS-001
+    domain: CROSS
+    natural_language: "Clinic ID is the canonical join key between SAAS and FINTECH domains."
+    formal: "JOIN(SAAS.entity, FINTECH.entity) => ON clinic_id"
+    severity: HARD
+    validation_query: null  # Structural constraint
+    status: HOMOLOGATED
+    last_validated: null
+
+  - id: AX-CROSS-002
+    domain: CROSS
+    natural_language: "Patient ID does NOT match between SAAS and FINTECH; use CPF for cross-domain joins."
+    formal: "JOIN(SAAS.PATIENT, FINTECH.PATIENT) => ON cpf, NOT ON patient_id"
+    severity: HARD
+    validation_query: null  # Structural constraint
+    status: HOMOLOGATED
+    last_validated: null
+
+  - id: AX-CROSS-003
+    domain: CROSS
+    natural_language: "Budget to Simulation association requires heuristic matching (clinic + CPF + time window)."
+    formal: "JOIN(BUDGET, SIMULATION) => HEURISTIC(clinic_id + cpf + time_window_24h)"
+    severity: SOFT
+    validation_query: null  # Design constraint
+    status: DRAFT
+    last_validated: null

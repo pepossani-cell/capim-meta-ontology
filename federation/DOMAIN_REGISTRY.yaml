@@ -1,0 +1,40 @@
+domains:
+  - id: SAAS
+    name: Capim Clinic OS (Operational Domain)
+    description: Manages Clinics, Patients (CRM), Budgets, Schedules, and Payment Infrastructure (POS/PayFac).
+    root_path: "c:/Users/pedro.possani_capim/ontologia-saas/_domain"
+    docs_path: "c:/Users/pedro.possani_capim/ontologia-saas/_domain/_docs"
+    governance: "c:/Users/pedro.possani_capim/ontologia-saas/_domain/_governance/MEMORY_ARCHITECTURE_CONSTITUTION.md"
+    entry_point: "START_HERE.md"
+    entity_index: "_docs/ONTOLOGY_INDEX_SAAS.yaml"
+    graph: "_docs/ENTITY_GRAPH.yaml"
+    status: ACTIVE
+    notes: |
+      Payment infrastructure (POS orders, PayFac transactions, TAG settlements) are part of SAAS domain.
+      All joins via clinic_id (master key, already glued to FINTECH).
+
+
+  - id: FINTECH
+    name: Capim BNPL (Risk & Credit Domain)
+    description: Manages Credit Simulations, Risk Analysis, Bureaus, and Financing Requests.
+    root_path: "c:/Users/pedro.possani_capim/bnpl-funil/_domain"
+    docs_path: "c:/Users/pedro.possani_capim/bnpl-funil/_domain/_docs"
+    governance: "c:/Users/pedro.possani_capim/bnpl-funil/_domain/_governance/MEMORY_ARCHITECTURE_CONSTITUTION.md"
+    entry_point: "START_HERE.md"
+    entity_index: "_docs/ONTOLOGY_INDEX_FINTECH.yaml"
+    graph: "_docs/ENTITY_GRAPH.yaml"
+    status: ACTIVE
+
+  - id: CLIENT_VOICE
+    name: Customer Voice & Support Intelligence (Data Ontology)
+    description: Consolidates, classifies, and generates insights from VoC sources (Zendesk, HubSpot, NPS). Data ontology separated from application layer.
+    root_path: "c:/Users/pedro.possani_capim/client-voice-data/_domain"
+    docs_path: "c:/Users/pedro.possani_capim/client-voice-data/_domain/_docs"
+    governance: "c:/Users/pedro.possani_capim/capim-meta-ontology/MEMORY_ARCHITECTURE_CONSTITUTION.md"
+    entry_point: "START_HERE.md"
+    entity_index: "_docs/ENTITY_INDEX.yaml"
+    ontology_index: "_docs/ONTOLOGY_INDEX.yaml"
+    graph: null  # Not yet implemented
+    status: ACTIVE
+    notes: "Application layer lives in separate project: client-voice-app/ (Streamlit dashboard)"
+

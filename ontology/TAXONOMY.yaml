@@ -1,0 +1,268 @@
+# TAXONOMY.yaml
+# Hierarchical classification of entities in the Capim Ecosystem
+# Reference: MEMORY_ARCHITECTURE_CONSTITUTION §DIRECTIVE:ONTOLOGY_FORMALIZATION
+# Last Updated: 2026-01-31
+
+classes:
+
+  # === ROOT CLASSES ===
+  
+  - name: ENTITY
+    parent: null
+    description: "Abstract root of all things in the ecosystem."
+    children: [ACTOR, EVENT, EVIDENCE, DIMENSION]
+    instances: []
+    properties: [id, created_at, updated_at]
+
+  # === ACTORS (Who) ===
+  
+  - name: ACTOR
+    parent: ENTITY
+    description: "An entity capable of taking action or being referenced as a party."
+    children: [CLINIC, PATIENT, USER]
+    instances: []
+    properties: []
+
+  - name: CLINIC
+    parent: ACTOR
+    description: "A dental clinic (the 'Retailer' in BNPL context)."
+    children: []
+    instances: [SAAS.CLINICS, FINTECH.CLINICS]
+    properties: 
+      - clinic_id
+      - clinic_name
+      - is_independent_clinic
+      - business_segmentation
+      - is_subscriber
+      - is_bnpl_eligible
+      - clinic_credit_score
+
+  - name: PATIENT
+    parent: ACTOR
+    description: "A natural person (CPF holder) who may be a borrower or financial responsible."
+    children: []
+    instances: [FINTECH.PATIENTS]
+    properties:
+      - patient_id
+      - cpf  # The canonical business key
+      - birthdate
+      - gender
+
+  - name: USER
+    parent: ACTOR
+    description: "A system user (clinic staff, admin, dentist)."
+    children: []
+    instances: [SAAS.USERS]
+    properties:
+      - user_id
+      - role
+      - clinic_id
+
+  # === EVENTS (What happened) ===
+  
+  - name: EVENT
+    parent: ENTITY
+    description: "A timestamped occurrence in the funnel."
+    children: [FUNNEL_EVENT, SUPPORT_EVENT, SAAS_EVENT]
+    instances: []
+    properties: [event_timestamp]
+
+  - name: FUNNEL_EVENT
+    parent: EVENT
+    description: "An event in the credit/sales funnel."
+    children: [C1_EVENT, C2_EVENT]
+    instances: []
+    properties: [clinic_id, patient_cpf]
+
+  - name: C1_EVENT
+    parent: FUNNEL_EVENT
+    description: "A credit simulation/pre-analysis (top of funnel)."
+    children: [CREDIT_SIMULATION, PRE_ANALYSIS]
+    instances: []
+    properties:
+      - c1_entity_type
+      - c1_entity_id
+      - outcome_bucket
+      - risk_score
+      - was_approved
+      - appealable
+
+  - name: CREDIT_SIMULATION
+    parent: C1_EVENT
+    description: "New Flow (2025+) credit simulation."
+    children: []
+    instances: [FINTECH.CREDIT_SIMULATIONS]
+    properties:
+      - credit_simulation_id
+      - credit_lead_id
+      - financial_responsible_id
+
+  - name: PRE_ANALYSIS
+    parent: C1_EVENT
+    description: "Legacy Flow (pre-2025) credit pre-analysis."
+    children: []
+    instances: [FINTECH.PRE_ANALYSES]
+    properties:
+      - pre_analysis_id
+      - financing_conditions  # Often empty
+
+  - name: C2_EVENT
+    parent: FUNNEL_EVENT
+    description: "A booking/request (conversion from C1)."
+    children: [REQUEST]
+    instances: []
+    properties:
+      - c1_origin_type
+      - c1_origin_id
+
+  - name: REQUEST
+    parent: C2_EVENT
+    description: "A formal credit request/booking."
+    children: []
+    instances: [FINTECH.REQUESTS]
+    properties:
+      - request_id
+      - request_status
+      - contract_signed_at
+      - paid_in_full_at
+
+  - name: SUPPORT_EVENT
+    parent: EVENT
+    description: "A customer support interaction."
+    children: [TICKET, CHAT]
+    instances: []
+    properties:
+      - clinic_id
+      - opened_at
+      - resolved_at
+      - category
+
+  - name: TICKET
+    parent: SUPPORT_EVENT
+    description: "A support ticket (Zendesk, Intercom, etc.)."
+    children: []
+    instances: [CLIENT_VOICE.TICKETS]
+    properties:
+      - ticket_id
+      - subject
+      - status
+
+  - name: SAAS_EVENT
+    parent: EVENT
+    description: "An operational event in the SaaS system."
+    children: [SCHEDULE, BUDGET]
+    instances: []
+    properties: [clinic_id]
+
+  - name: SCHEDULE
+    parent: SAAS_EVENT
+    description: "An appointment/schedule in the calendar."
+    children: []
+    instances: [SAAS.SCHEDULES]
+    properties:
+      - schedule_id
+      - patient_id
+      - scheduled_at
+      - status
+
+  - name: BUDGET
+    parent: SAAS_EVENT
+    description: "A treatment plan/budget proposal."
+    children: []
+    instances: [SAAS.BUDGETS]
+    properties:
+      - budget_id
+      - patient_id
+      - total_value
+      - approved_at
+
+  # === EVIDENCE (Supporting data) ===
+  
+  - name: EVIDENCE
+    parent: ENTITY
+    description: "External or derived data used to support decisions."
+    children: [BUREAU_CHECK, ENGINE_EXECUTION]
+    instances: []
+    properties: [source, checked_at]
+
+  - name: BUREAU_CHECK
+    parent: EVIDENCE
+    description: "A credit bureau check (Serasa, BVS, SCR)."
+    children: [CREDIT_CHECK, SCR_CHECK]
+    instances: []
+    properties:
+      - cpf
+      - source
+      - kind
+
+  - name: CREDIT_CHECK
+    parent: BUREAU_CHECK
+    description: "Serasa/BVS credit check with score and negative data."
+    children: []
+    instances: [FINTECH.CREDIT_CHECKS]
+    properties:
+      - credit_check_id
+      - serasa_score
+      - boa_vista_score
+      - pefin_count
+      - refin_count
+
+  - name: SCR_CHECK
+    parent: BUREAU_CHECK
+    description: "BACEN SCR (Sistema de Crédito) check."
+    children: []
+    instances: [FINTECH.SCR_CHECKS]
+    properties:
+      - total_debt_exposure
+      - operations_count
+      - bad_debt_value
+
+  - name: ENGINE_EXECUTION
+    parent: EVIDENCE
+    description: "A credit engine/motor execution log."
+    children: [CRIVO_CHECK]
+    instances: []
+    properties:
+      - engineable_type
+      - engineable_id
+
+  - name: CRIVO_CHECK
+    parent: ENGINE_EXECUTION
+    description: "Crivo decision engine execution."
+    children: []
+    instances: [FINTECH.CRIVO_CHECKS]
+    properties:
+      - crivo_check_id
+      - policy_result
+      - renda_presumida
+
+  # === DIMENSION (Context/Attributes) ===
+  
+  - name: DIMENSION
+    parent: ENTITY
+    description: "Contextual or reference data that enriches events."
+    children: [TIME_DIMENSION, GEO_DIMENSION]
+    instances: []
+    properties: []
+
+  - name: TIME_DIMENSION
+    parent: DIMENSION
+    description: "Temporal context (cohort, period)."
+    children: []
+    instances: []
+    properties:
+      - date
+      - week
+      - month
+      - quarter
+      - year
+
+  - name: GEO_DIMENSION
+    parent: DIMENSION
+    description: "Geographic context."
+    children: []
+    instances: []
+    properties:
+      - uf
+      - city
+      - region

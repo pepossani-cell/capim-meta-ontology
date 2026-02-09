@@ -1,0 +1,105 @@
+---
+description: Rules for Architectural Decisions and Memory Management with Atomic Decision Tracking
+globs: ["_memory/*.md", "_memory/**/*.md", "DECISIONS_*.md"]
+---
+
+# Decision & Memory Governance
+
+## 🎯 PRIMARY PROTOCOL: ATOMIC DECISION TRACKING
+
+**CRITICAL**: Update `DECISIONS_IN_PROGRESS.md` **IMMEDIATELY** after any confirmed decision or significant discovery.
+
+**DO NOT** batch updates at the end of the session. Each decision is an atomic checkpoint.
+
+## 1. Status Markers
+
+Use these exact markers in `DECISIONS_IN_PROGRESS.md`:
+
+- ✅ **Decided**: Agreement reached, ready for execution
+- ✅➡️ **Executed**: Decided AND implemented — ready to archive
+- ⏳ **Pending**: Awaiting confirmation or more information
+- 🔄 **In Debate**: Actively discussing options
+- ❌ **Rejected**: Decided against this option — ready to archive
+
+## 2. Decision Documentation Format
+
+When adding a decision to `DECISIONS_IN_PROGRESS.md`:
+
+```markdown
+| ID | Topic | Status | Decision | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| X.Y | [Topic] | [Status] | [Decision text] | [Rationale + related files] |
+```
+
+**Required fields**:
+- **ID**: Unique identifier (e.g., 5.1, 5.2)
+- **Topic**: Brief description
+- **Status**: One of the markers above
+- **Decision**: What was decided
+- **Notes**: Why + any file references
+
+## 3. Immediate Update Workflow
+
+**When a decision is confirmed**:
+
+1. **STOP** the current flow
+2. **UPDATE** `_memory/DECISIONS_IN_PROGRESS.md` immediately
+3. **THEN** resume work
+
+**Trigger phrases** that require immediate update:
+- "sim", "ok", "confirmado", "aprovado", "vamos com X"
+- "let's go with...", "I choose...", "agreed"
+
+## 4. Archival Process
+
+**Archive rule**: Items marked ✅➡️ (Executed) or ❌ (Rejected) should be moved to archive during session-end.
+
+**Do NOT**:
+- Delete decisions
+- Archive before execution is complete
+- Archive items still in debate
+
+**DO**:
+- Move to `_memory/DECISIONS_ARCHIVE/YYYY-MM_topic.md`
+- Keep original context and rationale
+- Use `@session-end` skill for guided archival
+
+## 5. Session Notes
+
+At the end of a work session or major milestone:
+
+- Create/update `_memory/SESSION_NOTES/YYYY-MM-DD.md`
+- Include:
+  - **Accomplishments**: What was completed
+  - **Key Decisions**: Summary of decisions made
+  - **Next Steps**: What remains pending
+  - **Knowledge Harvested**: Patterns or learnings
+
+## 6. Lessons Learned
+
+When a pattern emerges or a significant learning occurs:
+
+- Document in `_memory/LESSONS_LEARNED.md`
+- Include context, pattern, and when to apply
+- Reference specific decisions or session notes
+
+## 7. Integration with Skills
+
+This rule is automatically enforced when:
+- Using `@session-start` skill (loads context)
+- Using `@debate` skill (tracks decisions atomically)
+- Using `@session-end` skill (archives executed decisions)
+
+## 8. Anti-Patterns to Avoid
+
+❌ **Don't**:
+- Batch decisions at end of session
+- Use vague status markers
+- Skip documentation because "it's obvious"
+- Delete decisions instead of archiving
+
+✅ **Do**:
+- Update immediately after confirmation
+- Use exact status markers
+- Document rationale, not just decision
+- Archive executed items to keep tracker clean

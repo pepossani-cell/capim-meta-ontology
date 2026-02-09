@@ -1,0 +1,391 @@
+# CAPIM ECOSYSTEM - CURSOR ROOT RULES (GLOBAL)
+
+> **Purpose**: Shared rules and protocols for all projects in the Capim workspace  
+> **Last Updated**: 2026-02-03  
+> **Scope**: Applies to all repositories: bnpl-funil, ontologia-saas, client-voice-data, client-voice-app
+
+---
+
+## PRIMARY DIRECTIVE
+
+You are an expert AI software engineer working on the Capim Ecosystem.
+
+**Your behavior is governed by**:
+1. **Domain Rules** in `.cursor/rules/` (automatic, context-based)
+2. **Skills** in `.cursor/skills/` (invocable workflows)
+3. **Project-specific rules** in each project's `.cursorrules` (extends these globals)
+
+---
+
+## LANGUAGE & COMMUNICATION
+
+- **Language**: Always respond in **Portuguese (pt-BR)**
+- **Context**: You are operating in an **AI-first environment** with direct database access
+- **Transparency**: Explain technical decisions clearly, avoid jargon when communicating with users
+
+---
+
+## CURSOR RULES SYSTEM
+
+The following rules are automatically applied based on file type and context:
+
+### 1. Snowflake & Data Protocol
+
+**Rule**: `.cursor/rules/snowflake_data.mdc`
+
+**Applies to**: `**/*.sql`, `**/*.py`, `queries/**/*`, `scripts/**/*.py`
+
+**Key Principles**:
+- **Snowflake-First**: Validate hypotheses WHERE THE DATA LIVES (Snowflake), not in Python
+- **Zero Assumptions**: NEVER assume a column exists without profiling first
+- **Connection**: ALWAYS use `snowflake_connection.py` utility (never direct `snowflake.connector`)
+
+### 2. Memory & Decisions Governance
+
+**Rule**: `.cursor/rules/memory_governance.mdc`
+
+**Applies to**: `_memory/**/*.md`, `DECISIONS_*.md`
+
+**Key Principles**:
+- **Atomic Tracking**: Update `DECISIONS_IN_PROGRESS.md` IMMEDIATELY after confirmed decisions
+- **NO batching**: Each decision is a checkpoint, don't wait for session end
+- **Status Markers**: Use exact markers (Decided, Executed, Pending, In Debate, Rejected)
+
+### 3. Ontology Reasoning
+
+**Rule**: `.cursor/rules/ontology_reasoning.mdc`
+
+**Applies to**: `_ontology/**/*.yaml`, `_federation/**/*.yaml`, cross-domain queries
+
+**Key Principles**:
+- **Validate against axioms** before returning responses
+- **Check CAPABILITY_MATRIX** for query routing
+- **Never assume IDs match** across domains (except `clinic_id`, `CPF`)
+- **Time is fuzzy**: Use time windows for cross-domain event linkage
+
+### 4. Frontend & Design
+
+**Rule**: `.cursor/rules/frontend_design.mdc`
+
+**Applies to**: UI/Web files (`**/*.js`, `**/*.tsx`, Streamlit apps)
+
+**Key Principles**:
+- Prioritize Rich Aesthetics and premium UX
+- Avoid default Bootstrap/Streamlit looks
+- Use custom styling where possible
+
+---
+
+## SKILLS SYSTEM
+
+Skills can be invoked explicitly (`@skill-name`) or auto-detected:
+
+### Core Workflows
+
+| Skill | Purpose | Invocation |
+|-------|---------|------------|
+| `@session-start` | Load memory context and domain docs | Explicit or "let's start" |
+| `@session-end` | Archive decisions, create session notes | Explicit or "wrap up" |
+| `@debate` | Structured decision-making | Explicit or auto-detect ambiguity |
+
+### Specialized Skills
+
+| Skill | Purpose | Invocation |
+|-------|---------|------------|
+| `@clinic-health-check` | Multi-domain clinic diagnostic | `@clinic-health-check <id>` |
+| `@investigate-entity` | Profile Snowflake tables | `@investigate-entity <TABLE>` |
+| `@validate-axioms` | Validate data integrity | Explicit or pre-merge |
+| `@curate-memory` | Memory files housekeeping | Explicit or part of session-end |
+
+**Documentation**: See `.cursor/skills/README.md` for full details
+
+---
+
+## WINDOWS/POWERSHELL GUIDELINES
+
+### Command Chaining
+
+```powershell
+# Bad: && doesn't work in PowerShell
+cd folder && python script.py
+
+# Good: Use semicolon
+cd folder ; python script.py
+```
+
+### Avoid python -c
+
+```powershell
+# Bad: Escaping issues with long scripts
+python -c "import pandas; print('hello')"
+
+# Good: Use script file or module
+python -m src.cli.run_script
+```
+
+### Path Encoding
+
+- Be careful with Portuguese accents in paths
+- Use raw strings: `r'c:\Users\pedro...'`
+- Prefer forward slashes: `c:/Users/...`
+
+---
+
+## VISUALIZATION STANDARDS
+
+**Reference**: `docs/VISUALIZATION_STANDARDS.md`
+
+**Quick Guidelines**:
+- **Theme**: Seaborn whitegrid, talk, pastel
+- **Layout**: Dual panels for volume+share charts
+- **Legend**: Outside plot area (right side)
+- **Labels**: Always annotate latest month datapoints
+- **Export**: DPI 220, bbox_inches='tight'
+- **Traceability**: Include period, source, caveats in footer/caption
+
+**See full documentation** for complete code examples and anti-patterns.
+
+---
+
+## DATA LAYER AWARENESS (Cross-Project Standard)
+
+**Critical distinction** that applies to ALL projects in the ecosystem:
+
+### Layer Taxonomy
+
+| Layer | Ownership | Trust Level | Action Required |
+|:---|:---|:---|:---|
+| **SOURCE** | Data Engineering | VERIFY | Always validate Snowflake-first before documenting |
+| **SANDBOX** | This Project | THIS_PROJECT_OWNS | Validate against SOURCE + documented corrections |
+| **DERIVED** | This Project | VERIFY_INPUTS | Validate against inputs + transformation logic |
+| **EXTERNAL** | Third Party | LOW | Cross-reference with official documentation |
+
+### ENTITY_INDEX.yaml Required Fields
+
+Every entity in `ENTITY_INDEX.yaml` MUST have these fields:
+
+```yaml
+- name: ENTITY_NAME
+  layer: SOURCE | SANDBOX | DERIVED | EXTERNAL
+  ownership: DATA_ENG | THIS_PROJECT | THIRD_PARTY
+  trust_level: CANONICAL | VERIFY | EXPERIMENTAL
+  documentation:
+    semantic: path/to/*_SEMANTIC.md
+    agentic: path/to/*.md
+```
+
+### Invariants (Always Apply)
+
+1. **SOURCE entities (Data Eng)**: May have undocumented bugs, drift, or semantic ambiguity. NEVER assume correct without Snowflake-first validation.
+2. **SANDBOX entities (This Project)**: We control these. Document what they correct/enrich vs SOURCE.
+3. **When investigating**: First identify the layer, then adjust trust accordingly.
+
+---
+
+## ENTITY INVESTIGATION & DOCUMENTATION PROTOCOL
+
+**⚠️ CRITICAL**: Follow this protocol for ANY new entity documentation.
+
+### Step 0: Load Governance (MANDATORY)
+
+```
+BEFORE investigating/documenting ANY entity:
+1. Run @session-start (loads MEMORY_ARCHITECTURE_CONSTITUTION)
+2. Read 1 existing entity doc as template (e.g., BUDGETS in project)
+3. Understand: dual docs, anti-bloat, meta-ontology registry
+```
+
+### Step 1: Identify Layer & Ownership
+
+Before ANY investigation, determine:
+- **Which schema?** → Infer layer (SOURCE/SANDBOX/DERIVED)
+- **Who owns it?** → DATA_ENG or THIS_PROJECT
+- **Trust level?** → Adjust validation rigor accordingly
+- **Cross-domain?** → Will need meta-ontology registration
+
+### Step 2: Debate Structure (MANDATORY)
+
+**BEFORE creating files**, debate with user:
+
+```markdown
+## Decision: How to document <ENTITY>?
+
+Options:
+A) Local only (_domain/ in project)
+B) Local + meta-ontology (cross-domain entity)
+C) Skip (not relevant enough)
+
+Files to create:
+- <ENTITY>.md (agentic - data dictionary)
+- <ENTITY>_SEMANTIC.md (semantic - for humans)
+- Update ENTITY_INDEX.yaml
+- Update ENTITY_GRAPH.yaml
+- [If cross-domain] Register in capim-meta-ontology
+
+User approval required before proceeding.
+```
+
+### Step 3: Profile & Analyze
+
+1. **Check documentation first**:
+   - `docs/reference/<ENTITY>.md` (data dictionary)
+   - `_domain/_docs/reference/<ENTITY>_SEMANTIC.md` (semantic doc)
+
+2. **Profile schema** (if doc doesn't exist):
+   ```python
+   from src.utils.snowflake_connection import run_query
+   df = run_query("SELECT * FROM SCHEMA.TABLE LIMIT 1")
+   print(df.columns)
+   ```
+
+3. **Analyze**:
+   - Identify primary key / grain
+   - Check null patterns (fill rates)
+   - Verify categorical domains
+   - Analyze temporal drift
+   - Identify relationships (FKs)
+
+4. **Temporary profiling queries**:
+   - Create in `/tmp/` or memory only
+   - **NEVER commit** to `queries/audit/` unless permanent
+   - Clean up after profiling
+
+### Step 4: Document (Dual Protocol)
+
+Create BOTH documents:
+
+**Agentic doc** (`<ENTITY>.md`):
+- Schema table (columns, types, descriptions)
+- Common queries (copy-paste ready)
+- Quick reference (grain, PKs, FKs)
+- Upstream/downstream dependencies
+
+**Semantic doc** (`<ENTITY>_SEMANTIC.md`):
+- Purpose & business context
+- Grain explanation
+- Key columns with semantic meaning
+- Known issues & caveats
+- Relationships (why they exist)
+- Usage patterns (when to use this entity)
+- Quality checks
+
+### Step 5: Register Metadata
+
+Update in order:
+
+1. **Local project**:
+   - `_domain/_docs/ENTITY_INDEX.yaml` (add entity with layer/docs/failure_modes)
+   - `_domain/_docs/ENTITY_GRAPH.yaml` (add relationships)
+
+2. **Meta-ontology** (if cross-domain):
+   - `capim-meta-ontology/_ontology/DOMAIN_REGISTRY.yaml` (register domain has entity)
+   - `capim-meta-ontology/_federation/CROSS_DOMAIN_GLUE.yaml` (if joins across domains)
+
+### Step 6: Debate Semantics (MANDATORY)
+
+After initial docs, debate with user:
+- **Ambiguities**: Unclear semantics, edge cases
+- **Business rules**: Thresholds, definitions, SLAs
+- **Failure modes**: Known issues to document
+
+Refine semantic doc based on debate outcomes.
+
+### Step 7: Cleanup
+
+- Delete temporary profiling queries
+- Remove intermediate files
+- Verify no bloat introduced
+
+---
+
+**Checklist** (verify before marking complete):
+
+- [ ] @session-start executed
+- [ ] Existing entity doc consulted as template
+- [ ] Structure debated with user (files, location)
+- [ ] User approved plan before creating files
+- [ ] Dual docs created (agentic + semantic)
+- [ ] ENTITY_INDEX.yaml updated
+- [ ] ENTITY_GRAPH.yaml updated
+- [ ] Meta-ontology registered (if cross-domain)
+- [ ] Semantics debated with user
+- [ ] Temporary files cleaned up
+
+**Use `@investigate-entity` skill** for automated profiling.
+
+**NEVER infer semantics without seeing actual data** (Zero Assumptions protocol).
+
+---
+
+## PROJECT HIERARCHY
+
+### Ontology Projects
+
+Projects with `_domain/` folder structure:
+
+| Project | Domain | Entry Point |
+|---------|--------|-------------|
+| `bnpl-funil` | FINTECH | `_domain/START_HERE.md` |
+| `ontologia-saas` | SAAS | `_domain/START_HERE.md` |
+| `client-voice-data` | CLIENT_VOICE | `_domain/START_HERE.md` |
+
+**Standard structure**:
+```
+<project>/
+├── _domain/
+│   ├── _docs/
+│   │   ├── ENTITY_INDEX.yaml
+│   │   ├── ONTOLOGY_INDEX_<DOMAIN>.yaml
+│   │   └── reference/
+│   │       └── *_SEMANTIC.md
+│   ├── _governance/
+│   │   └── MEMORY_ARCHITECTURE_CONSTITUTION.md
+│   └── START_HERE.md
+├── docs/
+│   └── reference/ (data dictionaries)
+├── queries/
+├── scripts/
+└── .cursorrules (EXTENDS this global file)
+```
+
+### Application Projects
+
+Projects focused on UI/frontend:
+
+| Project | Purpose | Technology |
+|---------|---------|------------|
+| `client-voice-app` | VoC Dashboard | Streamlit |
+
+---
+
+## PROJECT-SPECIFIC CURSORRULES
+
+Each project EXTENDS these global rules with domain-specific additions:
+
+**Header format** for project cursorrules:
+```markdown
+# Project Name Rules
+
+> **EXTENDS**: `../capim-meta-ontology/.cursorrules` (global rules)
+
+## Domain-Specific Rules
+
+[Project-specific content]
+```
+
+---
+
+## DEPRECATED SYSTEMS
+
+**`.agent/` folder**: DEPRECATED as of 2026-02-03
+
+- Workflows migrated to `.cursor/skills/`
+- Protocols migrated to `.cursor/rules/`
+- See: `.agent/README.md` for deprecation notice
+
+**Do NOT** use `/session-start` commands. Use `@session-start` skills instead.
+
+---
+
+**Version**: 2.0 (Standardized Hierarchy)  
+**Effective**: 2026-02-03

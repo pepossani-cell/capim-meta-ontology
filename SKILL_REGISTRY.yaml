@@ -1,0 +1,452 @@
+# Skill Registry — Capim Ecosystem
+# Purpose: Centralized catalog of all skills across tiers
+# Last Updated: 2026-02-04
+# Status: LIVING DOCUMENT (update when skills added/removed/promoted)
+
+###############################################################################
+# TIER 1: CORE SKILLS (Global, Immutable)
+###############################################################################
+
+core_skills:
+  - name: session-start
+    tier: 1
+    location: capim-meta-ontology/.cursor/skills/session-start/
+    owner: architecture
+    status: stable
+    version: "2.0"
+    auto_invoke: silent
+    description: Initialize work session by loading memory context and domain-specific documentation
+    used_by: [all_projects]
+    breaking_changes: []
+    last_updated: "2026-02-04"
+
+  - name: session-end
+    tier: 1
+    location: capim-meta-ontology/.cursor/skills/session-end/
+    owner: architecture
+    status: stable
+    version: "2.0"
+    auto_invoke: ask_first
+    description: Archive executed decisions and consolidate session notes
+    used_by: [all_projects]
+    breaking_changes: []
+    last_updated: "2026-02-04"
+
+  - name: debate
+    tier: 1
+    location: capim-meta-ontology/.cursor/skills/debate/
+    owner: architecture
+    status: stable
+    version: "2.0"
+    auto_invoke: ask_first
+    description: Structured decision-making for complex topics with multiple options
+    used_by: [all_projects]
+    composed_by: [formalize-saas-finding, analyze-conversion-funnel]
+    breaking_changes: []
+    last_updated: "2026-02-04"
+
+  - name: curate-memory
+    tier: 1
+    location: capim-meta-ontology/.cursor/skills/curate-memory/
+    owner: architecture
+    status: stable
+    version: "2.0"
+    auto_invoke: ask_first
+    description: Automate governance and housekeeping of memory files
+    used_by: [all_projects]
+    breaking_changes: []
+    last_updated: "2026-02-04"
+
+###############################################################################
+# TIER 2: SHARED SKILLS (Global, Extensible)
+###############################################################################
+
+shared_skills:
+  - name: investigate-entity
+    tier: 2
+    location: capim-meta-ontology/.cursor/skills/investigate-entity/
+    owner: shared
+    status: stable
+    version: "2.0"
+    auto_invoke: ask_first
+    description: Automatically investigate and profile a Snowflake table or view following the Zero Assumptions protocol
+    used_by: [saas, fintech, client_voice]
+    extensions:
+      saas: references/saas_entity_patterns.md (planned)
+      fintech: references/fintech_entity_patterns.md (planned)
+      client_voice: references/client_voice_entity_patterns.md (planned)
+    references:
+      - references/DEBATE_QUESTIONS.md
+      - references/VALIDATION_EXAMPLES.md
+    breaking_changes: []
+    last_updated: "2026-02-04"
+
+  - name: validate-axioms
+    tier: 2
+    location: capim-meta-ontology/.cursor/skills/validate-axioms/
+    owner: shared
+    status: stable
+    version: "2.0"
+    auto_invoke: silent
+    description: Validate ontology axioms against Snowflake data to ensure data integrity
+    used_by: [saas, fintech, client_voice]
+    extensions:
+      fintech: validate-fintech-axioms (domain skill extends this)
+    breaking_changes: []
+    last_updated: "2026-02-04"
+
+  - name: clinic-health-check
+    tier: 2
+    location: capim-meta-ontology/.cursor/skills/clinic-health-check/
+    owner: shared
+    status: stable
+    version: "2.0"
+    auto_invoke: ask_first
+    description: Execute comprehensive health diagnostic for a specific clinic across all domains
+    used_by: [saas, fintech, client_voice]
+    composed_by: [correlate-tickets-events]
+    breaking_changes: []
+    last_updated: "2026-02-04"
+
+  # PLANNED: To be implemented
+
+  - name: eda-workflow
+    tier: 2
+    location: capim-meta-ontology/.cursor/skills/eda-workflow/
+    owner: shared
+    status: active
+    version: "1.0"
+    auto_invoke: ask_first
+    description: FST-based workflow for exploratory data analysis with integrated debate. Implements 3-state machine (tateante→calibrar→estável) with guardrails that trigger @debate on ambiguity.
+    used_by: [saas, fintech, client_voice]
+    composes: [investigate-entity, debate, formalize-saas-finding]
+    migrated_from: 
+      - ontologia-saas/docs/how_to/EDA_PLAYBOOK.md
+      - ontologia-saas/docs/how_to/PROGRESSIVE_FORMALIZATION.md
+    references:
+      - references/fst_transitions.md
+      - references/debate_triggers.md
+    extensions:
+      saas: references/eda_saas.md
+      fintech: references/eda_fintech.md
+      client_voice: references/eda_client_voice.md
+    breaking_changes: []
+    implemented_date: "2026-02-04"
+    last_updated: "2026-02-04"
+    external_references:
+      - "OpenAI: A Practical Guide to Building Agents (2025)"
+      - "DatawiseAgent: FST-Based Framework (EMNLP 2025)"
+
+  - name: detect-drift
+    tier: 2
+    location: capim-meta-ontology/.cursor/skills/detect-drift/
+    owner: shared
+    status: active
+    version: "1.0"
+    auto_invoke: silent
+    description: Detect CROSS-DOMAIN drift in federation axioms and shared entities. Validates semantic consistency across domains.
+    used_by: [saas, fintech, client_voice]
+    composes: [investigate-entity]  # Uses investigate-entity for profiling
+    migrated_from: ontologia-saas/docs/how_to/DETECT_DRIFT.md
+    references:
+      - references/cross_domain_thresholds.yaml
+    extensions:
+      saas: references/drift_saas_thresholds.yaml (planned)
+      fintech: references/drift_fintech_thresholds.yaml (planned)
+      client_voice: references/drift_client_voice_thresholds.yaml (planned)
+    breaking_changes: []
+    implemented_date: "2026-02-04"
+    last_updated: "2026-02-04"
+    notes: "Cross-domain only. Intra-domain drift handled by Tier 3 @detect-*-drift skills."
+
+  - name: materialize-view
+    tier: 2
+    location: capim-meta-ontology/.cursor/skills/materialize-view/
+    owner: shared
+    status: active
+    version: "1.0"
+    auto_invoke: ask_first
+    description: Materialize views to tables with validation, scheduling, and incremental support. Generic workflow for all domains.
+    used_by: [saas, fintech, client_voice]
+    composes: [investigate-entity, validate-axioms]
+    references:
+      - references/strategy_decision_tree.md
+    extensions:
+      saas: references/materialize_saas.md
+      fintech: references/materialize_fintech.md
+      client_voice: references/materialize_client_voice.md
+    breaking_changes: []
+    implemented_date: "2026-02-04"
+    last_updated: "2026-02-04"
+    notes: "Promoted from FINTECH P4. Each domain decides WHAT to materialize; skill provides HOW."
+
+###############################################################################
+# TIER 3: DOMAIN SKILLS (Local, Autonomous)
+###############################################################################
+
+domain_skills:
+
+  # SAAS DOMAIN
+  saas:
+    project: ontologia-saas
+    location: ontologia-saas/.cursor/skills/
+    owner: saas-team
+    skills:
+      - name: validate-saas-contracts
+        tier: 3
+        status: active
+        version: "1.0"
+        auto_invoke: ask_first
+        description: Validate budget/procedure contracts for semantic consistency
+        migrated_from: docs/how_to/CONTRACTS_AND_DECISIONS.md
+        bundled_scripts:
+          - scripts/validate_contract.py (planned)
+        references:
+          - references/CONTRACT_TEMPLATE.md
+          - references/SEMANTIC_CHECKLIST.md
+        priority: P1
+        implemented_date: "2026-02-04"
+        last_updated: "2026-02-04"
+
+      - name: formalize-saas-finding
+        tier: 3
+        status: active
+        version: "1.0"
+        auto_invoke: ask_first
+        description: Progressive formalization of EDA findings specific to SAAS
+        migrated_from: docs/how_to/PROGRESSIVE_FORMALIZATION.md
+        composes: [debate, validate-saas-contracts]
+        references:
+          - references/PROMOTION_CHECKLIST.md
+        priority: P2
+        implemented_date: "2026-02-04"
+        last_updated: "2026-02-04"
+
+      - name: analyze-financial-ops
+        tier: 3
+        status: planned
+        version: "1.0"
+        auto_invoke: ask_first
+        description: Deep dive analysis of financial operations (budgets, procedures, transactions)
+        bundled_scripts:
+          - scripts/analyze_financial_ops.py
+        references:
+          - references/FINANCIAL_OPS_METRICS.md
+        assets:
+          - assets/financial_ops_template.py
+        priority: P4
+        estimated_effort: 3-5 days
+        target_date: "2026-02-25"
+
+      - name: detect-saas-drift
+        tier: 3
+        status: active
+        version: "1.0"
+        auto_invoke: silent
+        description: Detect INTRA-DOMAIN drift in SAAS entities (clinic activity, budgets, procedures). Domain-specific thresholds.
+        composes: [investigate-entity]  # Uses investigate-entity for profiling
+        bundled_scripts: []
+        references:
+          - references/SAAS_DRIFT_THRESHOLDS.yaml
+        priority: P3
+        implemented_date: "2026-02-04"
+        last_updated: "2026-02-04"
+        notes: "Intra-domain only. Cross-domain drift handled by Tier 2 @detect-drift."
+
+  # FINTECH DOMAIN
+  fintech:
+    project: bnpl-funil
+    location: bnpl-funil/.cursor/skills/
+    owner: fintech-team
+    skills:
+      - name: analyze-conversion-funnel
+        tier: 3
+        status: active
+        version: "1.0"
+        auto_invoke: ask_first
+        description: Analyze C1→C2 conversion funnel with BNPL-specific logic
+        bundled_scripts:
+          - scripts/analyze_conversion.py (planned)
+        references:
+          - references/BRIDGE_LOGIC.md
+          - references/CONVERSION_METRICS.md
+        assets:
+          - assets/funnel_viz_template.py (planned)
+        priority: P1
+        implemented_date: "2026-02-04"
+        last_updated: "2026-02-04"
+
+      - name: validate-fintech-axioms
+        tier: 3
+        status: active
+        version: "1.0"
+        auto_invoke: ask_first
+        description: Validate FINTECH-specific axioms (risk rules, bureau constraints)
+        extends: validate-axioms (Tier 2)
+        bundled_scripts: []
+        references:
+          - references/AXIOM_CATALOG.md
+        priority: P2
+        implemented_date: "2026-02-04"
+        last_updated: "2026-02-04"
+
+      - name: bridge-temporal-events
+        tier: 3
+        status: active
+        version: "1.0"
+        auto_invoke: ask_first
+        description: Execute time-window joins for C1-C2-Bureaus-Crivo (FINTECH-specific)
+        bundled_scripts: []
+        references:
+          - references/TIME_WINDOW_RATIONALE.md
+        semantic_doc: _domain/_docs/reference/BRIDGE_C1_C2_BUREAUS_CRIVO_SEMANTIC.md
+        priority: P2
+        implemented_date: "2026-02-04"
+        last_updated: "2026-02-04"
+
+      - name: detect-fintech-drift
+        tier: 3
+        status: active
+        version: "1.0"
+        auto_invoke: silent
+        description: Detect INTRA-DOMAIN drift in credit scores, rejection rates, bureau availability. Domain-specific thresholds.
+        composes: [investigate-entity]  # Uses investigate-entity for profiling
+        bundled_scripts: []
+        references:
+          - references/FINTECH_DRIFT_THRESHOLDS.yaml
+        priority: P3
+        implemented_date: "2026-02-04"
+        last_updated: "2026-02-04"
+        notes: "Intra-domain only. Cross-domain drift handled by Tier 2 @detect-drift."
+
+      # NOTE: materialize-enriched-entity MERGED into Tier 2 @materialize-view
+      # FINTECH-specific patterns will be in: capim-meta-ontology/.cursor/skills/materialize-view/references/materialize_fintech.md
+      # Existing scripts (materialize_enriched_credit_simulations_borrower.py, etc.) remain in bnpl-funil/src/cli/
+
+  # CLIENT_VOICE DOMAIN
+  client_voice:
+    project: client-voice-data
+    location: client-voice-data/.cursor/skills/
+    owner: cx-team
+    skills:
+      - name: analyze-voc-sentiment
+        tier: 3
+        status: active
+        version: "1.0"
+        auto_invoke: ask_first
+        description: Analyze Voice of Customer sentiment trends and patterns
+        bundled_scripts:
+          - scripts/analyze_sentiment.py (planned)
+        references:
+          - references/VOC_METRICS.md
+          - references/CATEGORY_TAXONOMY.md
+        priority: P1
+        implemented_date: "2026-02-04"
+        last_updated: "2026-02-04"
+
+      - name: correlate-tickets-events
+        tier: 3
+        status: active
+        version: "1.0"
+        auto_invoke: ask_first
+        description: Correlate support tickets with SAAS/FINTECH events (cross-domain)
+        composes: [clinic-health-check, analyze-voc-sentiment]
+        bundled_scripts: []
+        references:
+          - references/CORRELATION_PATTERNS.md
+        priority: P2
+        implemented_date: "2026-02-04"
+        last_updated: "2026-02-04"
+
+      - name: classify-support-issues
+        tier: 3
+        status: planned
+        version: "1.0"
+        auto_invoke: ask_first
+        description: LLM-enhanced classification of support tickets (manual/ad-hoc)
+        bundled_scripts:
+          - scripts/classify_tickets.py
+        references:
+          - references/LLM_PROMPTS.md
+          - references/CATEGORY_DEFINITIONS.md
+        priority: P4
+        estimated_effort: 2-3 days
+        target_date: "2026-02-25"
+
+###############################################################################
+# METADATA & STATISTICS
+###############################################################################
+
+metadata:
+  total_skills: 22
+  core_skills_count: 4
+  shared_skills_count: 6  # Added materialize-view
+  domain_skills_count: 12  # Removed materialize-enriched-entity (merged to Tier 2)
+  
+  status_breakdown:
+    stable: 7
+    active: 12  # Added detect-saas-drift, detect-fintech-drift
+    planned: 3  # Only P4 skills remaining
+  
+  by_tier:
+    tier_1: 4
+    tier_2: 6  # Added materialize-view
+    tier_3: 12  # Removed materialize-enriched-entity
+  
+  by_domain:
+    meta: 8 # Core (4) + Shared (4) - note: shared count in by_tier is 6 but some overlap
+    saas: 4
+    fintech: 4  # Removed materialize-enriched-entity (merged to Tier 2)
+    client_voice: 3
+  
+  priority_breakdown:
+    P1: 3 # High-value, implement first
+    P2: 4 # Medium complexity
+    P3: 2 # After Tier 2 stabilizes
+    P4: 2 # Specialized/lower priority (reduced: materialize merged)
+
+  estimated_total_effort: "AI-assisted: hours not days"
+  
+  last_updated: "2026-02-04"
+  next_review: "2026-03-04" # Quarterly review
+
+###############################################################################
+# PROMOTION HISTORY (Skills promoted from T3 → T2 → T1)
+###############################################################################
+
+promotion_history:
+  - skill: materialize-view
+    from: tier_3_fintech (materialize-enriched-entity)
+    to: tier_2_shared
+    date: "2026-02-04"
+    reason: "All domains need materialization. Promoted to shared with domain-specific extensions."
+    breaking_changes: []
+    decision_ref: "DECISIONS_IN_PROGRESS.md#13.3"
+
+###############################################################################
+# DEPRECATION HISTORY (Skills archived or removed)
+###############################################################################
+
+deprecation_history: []
+# Example entry (when it happens):
+# - skill: old-skill-name
+#   tier: 3
+#   domain: saas
+#   deprecated_date: "2026-02-01"
+#   reason: "Replaced by new-skill-name"
+#   archived_location: .cursor/skills/_deprecated/old-skill-name/
+
+###############################################################################
+# NOTES
+###############################################################################
+
+notes: |
+  - This registry is the single source of truth for skill inventory
+  - Update this file when:
+    - Adding new skills
+    - Promoting skills to higher tier
+    - Deprecating skills
+    - Changing ownership or status
+  - Quarterly review required (see metadata.next_review)
+  - Skills with status=planned should have target_date
+  - Skills with status=stable should have breaking_changes documented (if any)

@@ -1,0 +1,255 @@
+# INFERENCE_RULES.yaml
+# Predefined reasoning patterns for cross-domain queries
+# Reference: MEMORY_ARCHITECTURE_CONSTITUTION §DIRECTIVE:ONTOLOGY_FORMALIZATION
+# Last Updated: 2026-01-31
+
+rules:
+
+  # === CROSS-DOMAIN DIAGNOSTIC RULES ===
+
+  - id: RULE-CROSS-001
+    name: "Clinic Health Diagnostic"
+    trigger: "User asks about 'problems', 'issues', 'health', or 'status' of a specific clinic"
+    preconditions:
+      - "clinic_id is resolvable from query (by name, ID, or context)"
+    actions:
+      - type: QUERY
+        domain: CLIENT_VOICE
+        capability: ClinicHealthSignals
+        params: 
+          clinic_id: "{resolved_clinic_id}"
+        output_key: "support_health"
+        description: "Get aggregated support signals (ticket count, sentiment, top issues)"
+      
+      - type: QUERY
+        domain: SAAS
+        capability: ScheduleVolume
+        params:
+          clinic_id: "{resolved_clinic_id}"
+          date_range: "last_90_days"
+        output_key: "schedule_data"
+        description: "Get operational activity metrics"
+      
+      - type: QUERY
+        domain: SAAS
+        capability: ChurnRisk
+        params:
+          clinic_id: "{resolved_clinic_id}"
+        output_key: "churn_data"
+        description: "Assess churn probability"
+      
+      - type: QUERY
+        domain: FINTECH
+        capability: RejectionRate
+        params:
+          clinic_id: "{resolved_clinic_id}"
+          date_range: "last_90_days"
+        output_key: "rejection_data"
+        description: "Get credit rejection trends"
+
+    synthesis: |
+      1. Start with support_health signals:
+         - If ticket_count_90d > 5 AND avg_sentiment < 2.5: flag as SUPPORT_CRISIS
+         - If top_issues contains "cancelamento" or "erro": flag as URGENT
+      2. Cross-reference with schedule_data:
+         - Calculate week-over-week change in appointment volume
+         - If drop > 20% within 7 days of support spike: flag as LIKELY_CAUSAL
+      3. Check churn_data:
+         - If churn_probability > 0.7: flag as HIGH_CHURN_RISK
+      4. Check rejection_data:
+         - If rejection_rate increased > 10pp: flag as CREDIT_ISSUE
+      5. Synthesize findings:
+         - If SUPPORT_CRISIS + HIGH_CHURN_RISK: recommend immediate CS outreach
+         - If LIKELY_CAUSAL: recommend operational review
+
+    output_schema:
+      findings: [STRING]
+      health_status: [CRITICAL, WARNING, HEALTHY]
+      correlations:
+        - event_a: STRING
+          event_b: STRING
+          lag_days: INTEGER
+          confidence: FLOAT
+      metrics:
+        schedule_trend: FLOAT
+        rejection_trend: FLOAT
+        ticket_count: INTEGER
+        avg_sentiment: FLOAT
+        churn_probability: FLOAT
+      top_issues: [STRING]
+      recommended_actions: [STRING]
+      data_for_visualization:
+        chart_type: "line"
+        series: [OBJECT]
+        annotations: [OBJECT]
+    
+    status: HOMOLOGATED
+
+  - id: RULE-CROSS-002
+    name: "Conversion Analysis"
+    trigger: "User asks about 'conversion', 'funnel', or 'C1 to C2' for a clinic or period"
+    preconditions:
+      - "clinic_id OR date_range is provided"
+    actions:
+      - type: QUERY
+        domain: FINTECH
+        capability: ConversionFunnel
+        params:
+          clinic_id: "{resolved_clinic_id}"
+          date_range: "{resolved_date_range}"
+        output_key: "funnel_data"
+
+      - type: QUERY
+        domain: FINTECH
+        capability: RejectionReasons
+        params:
+          clinic_id: "{resolved_clinic_id}"
+          date_range: "{resolved_date_range}"
+        output_key: "rejection_reasons"
+
+    synthesis: |
+      1. Calculate conversion rate = c2_count / c1_approved_count.
+      2. Identify top 3 rejection reasons.
+      3. If conversion rate < 30%, flag as LOW_CONVERSION.
+      4. Compare to ecosystem average if available.
+
+    output_schema:
+      conversion_rate: FLOAT
+      benchmark_rate: FLOAT
+      top_rejection_reasons: [STRING]
+      recommendation: STRING
+
+    status: DRAFT
+
+  - id: RULE-FINTECH-002
+    name: "C1 to C2 Conversion Logic"
+    trigger: "Agent reasons about why C1 has/doesn't have C2, or asks about conversion prerequisites"
+    preconditions:
+      - "Context involves C1_LIFECYCLE or conversion analysis"
+    axiom_reference: AX-FINTECH-006
+    
+    reasoning_chain: |
+      GIVEN: C1 entity (pre_analysis or credit_simulation)
+      
+      STEP 1: Check approval status
+        IF c1_was_approved = FALSE:
+          => C2 conversion is IMPOSSIBLE (blocked by business rule)
+          => c2_count = 0 is EXPECTED
+          => DO NOT flag as anomaly or data issue
+      
+      STEP 2: If approved, check conversion
+        IF c1_was_approved = TRUE AND c2_count = 0:
+          => This is NORMAL (conversion rate ~12-15%)
+          => Patient may have: chosen competitor, postponed, abandoned
+          => DO NOT flag as data issue
+      
+      STEP 3: If C2 exists, validate
+        IF c2_count > 0:
+          => VERIFY c1_was_approved = TRUE (axiom AX-FINTECH-006)
+          => If violated, flag as DATA_INTEGRITY_ISSUE
+      
+      STEP 4: C2 approval is INDEPENDENT
+        c2.was_approved may differ from c1_was_approved
+        => C2 has additional checks (income verification, documents, etc.)
+        => "Approved in C1 but rejected in C2" is a valid state
+    
+    common_misconceptions:
+      - mistake: "c2_count = 0 means data is missing"
+        correction: "Most C1s don't convert; this is expected business behavior"
+      
+      - mistake: "c1_was_approved should equal c2.was_approved"
+        correction: "These are independent evaluation stages"
+      
+      - mistake: "All approved simulations become contracts"
+        correction: "Only ~12-15% convert; patient choice is the main filter"
+    
+    example_scenarios:
+      - scenario: "C1 with c1_was_approved=FALSE, c2_count=0"
+        interpretation: "Correct - rejected C1 cannot generate C2"
+        action: "No further investigation needed"
+      
+      - scenario: "C1 with c1_was_approved=TRUE, c2_count=0"
+        interpretation: "Normal - patient didn't proceed"
+        action: "May analyze for conversion optimization"
+      
+      - scenario: "C1 with c1_was_approved=FALSE, c2_count>0"
+        interpretation: "ANOMALY - violates AX-FINTECH-006"
+        action: "Flag for data quality review"
+    
+    status: HOMOLOGATED
+
+  # === SINGLE-DOMAIN RULES ===
+
+  - id: RULE-FINTECH-001
+    name: "Risk Deep Dive"
+    trigger: "User asks about 'risk', 'credit', 'score' for a specific CPF or patient"
+    preconditions:
+      - "cpf is resolvable from query"
+    actions:
+      - type: QUERY
+        domain: FINTECH
+        capability: RiskProfile
+        params:
+          cpf: "{resolved_cpf}"
+        output_key: "risk_profile"
+
+      - type: RETRIEVE
+        domain: FINTECH
+        source: "BRIDGE_C1_C2_BUREAUS_CRIVO_SEMANTIC.md"
+        query: "bureau association rules"
+        output_key: "bridge_context"
+
+    synthesis: |
+      1. Present risk score and breakdown (Capim, Serasa, BVS, SCR).
+      2. List negative events (PEFIN, REFIN, Protesto) if any.
+      3. Note any data gaps (e.g., SCR unavailable).
+      4. Reference Bridge logic if explaining how data was associated.
+
+    output_schema:
+      risk_summary:
+        capim_score: NUMBER
+        serasa_score: NUMBER
+        bvs_score: NUMBER
+        total_debt_exposure: FLOAT
+      negative_events:
+        pefin_count: NUMBER
+        refin_count: NUMBER
+        protesto_count: NUMBER
+      caveats: [STRING]
+
+    status: DRAFT
+
+  - id: RULE-SAAS-001
+    name: "Churn Risk Assessment"
+    trigger: "User asks about 'churn', 'inactive', 'leaving' for a clinic"
+    preconditions:
+      - "clinic_id is resolvable"
+    actions:
+      - type: QUERY
+        domain: SAAS
+        capability: ChurnRisk
+        params:
+          clinic_id: "{resolved_clinic_id}"
+        output_key: "churn_data"
+
+      - type: QUERY
+        domain: SAAS
+        capability: ScheduleVolume
+        params:
+          clinic_id: "{resolved_clinic_id}"
+          date_range: "last_30_days"
+        output_key: "recent_activity"
+
+    synthesis: |
+      1. If churn_probability > 0.7, flag as HIGH_RISK.
+      2. If days_since_last_activity > 60, flag as DORMANT.
+      3. If appointment_count dropped > 50% MoM, flag as DECLINING.
+      4. Suggest proactive outreach if HIGH_RISK or DORMANT.
+
+    output_schema:
+      churn_status: [HIGH_RISK, MEDIUM_RISK, LOW_RISK, HEALTHY]
+      days_inactive: NUMBER
+      activity_trend: FLOAT
+      recommended_action: STRING
+
+    status: DRAFT

@@ -1,0 +1,373 @@
+# Entity Documentation Protocol: Dual Documentation Pattern
+
+## 🎯 PRIMARY PRINCIPLE: SEMANTIC + AGENTIC SEPARATION
+
+Every entity (table/view) in the ontology MUST be documented with TWO complementary files in SEPARATE LOCATIONS:
+
+| Type | Suffix | Location | Purpose |
+|:-----|:-------|:---------|:--------|
+| **Semantic** | `*_SEMANTIC.md` | `_domain/_docs/reference/` | Business context ("Why") |
+| **Data Dictionary** | `*.md` (no suffix) | `docs/reference/` | Technical facts ("How") |
+
+**Origin**: Defined in SESSION_NOTES/2026-02-02 as "Map vs X-Ray" distinction.
+**Decision**: Standardized 2026-02-05 (docs split across two folders).
+
+---
+
+## 1. When This Rule Applies
+
+**Auto-applied when**:
+- Creating or editing files in `**/_domain/_docs/reference/*_SEMANTIC.md`
+- Creating or editing files in `**/docs/reference/*.md`
+- Using `@investigate-entity` skill
+- Documenting new entities in ENTITY_INDEX.yaml
+- Reviewing ontology documentation
+
+**Trigger globs**:
+- `**/_domain/_docs/reference/*.md` (semantic)
+- `**/docs/reference/*.md` (agentic/data dictionary)
+
+---
+
+## 2. The Dual Pattern
+
+### File Naming & Location Convention
+
+```
+_domain/_docs/reference/<ENTITY>_SEMANTIC.md   ← Business context, "Why"
+docs/reference/<ENTITY>.md                      ← Technical details, "How"
+```
+
+**Examples**:
+```
+✅ CORRECT (in bnpl-funil):
+  _domain/_docs/reference/CREDIT_SIMULATIONS_SEMANTIC.md  (semantic)
+  docs/reference/CREDIT_SIMULATIONS.md                    (data dictionary)
+
+✅ CORRECT (in client-voice-data):
+  _domain/_docs/reference/ZENDESK_TICKETS_SEMANTIC.md     (semantic)
+  docs/reference/ZENDESK_TICKETS.md                       (data dictionary)
+
+❌ INCORRECT:
+  _domain/_docs/reference/ZENDESK_TICKETS.md  ← Agentic should NOT be in _domain
+  docs/reference/ZENDESK_TICKETS_SEMANTIC.md  ← Semantic should NOT be in docs
+  ZENDESK_TICKETS_DOCS.md (unclear naming)
+  ZENDESK_TICKETS_BUSINESS.md (non-standard suffix)
+```
+
+### Cross-Reference Requirement
+
+**BOTH files MUST reference each other** in the header with correct relative paths:
+
+```markdown
+# <ENTITY>_SEMANTIC.md header (in _domain/_docs/reference/):
+> **Domain**: <DOMAIN_ID>
+> **Related Reference**: [<ENTITY>.md](../../../docs/reference/<ENTITY>.md)
+> **Last Updated**: YYYY-MM-DD
+
+# <ENTITY>.md header (in docs/reference/):
+> **Domain**: <DOMAIN_ID>
+> **Related Reference**: [<ENTITY>_SEMANTIC.md](../../_domain/_docs/reference/<ENTITY>_SEMANTIC.md)
+> **Last Updated**: YYYY-MM-DD
+```
+
+---
+
+## 3. Content Separation: What Goes Where?
+
+### SEMANTIC Doc (`*_SEMANTIC.md`) — The "Map"
+
+**Purpose**: Business context for humans and agents to understand "Why does this exist?"
+
+**Mandatory Sections**:
+
+```markdown
+## 1. Business Definition
+**What is this entity?** (In plain language, 1-2 sentences)
+
+## 2. Grain (Business Perspective)
+**What does one row represent?** (e.g., "One credit simulation attempt")
+
+## 3. Key Relationships
+### Upstream (Dependencies)
+### Downstream (Dependents)
+
+## 4. Common Questions This Answers
+- [x] Example query 1
+- [x] Example query 2
+
+## 5. Status Semantics (if applicable)
+| Status Value | Business Meaning | Notes |
+
+## 6. Scale & Units (if applicable)
+| Field | Unit | Notes |
+
+## 7. Limitations & Caveats
+### What this entity CANNOT answer
+### Known Data Quality Issues
+
+## 8. PII & Sensitivity (if applicable)
+| Column | Sensitivity | Notes |
+
+## 9. Source & Confirmation
+**Source System**: (e.g., Zendesk, Snowflake CAPIM_PRODUCTION)
+**Confirmation Level**:
+- [ ] Confirmed by business owner
+- [ ] Observed in data
+- [ ] Inferred
+```
+
+**Tone**: Narrative, explanatory, context-rich.
+
+**What NOT to include**:
+- SQL queries (unless illustrative of business logic)
+- Exact column data types (use Agentic doc)
+- Profiling statistics (use Agentic doc)
+
+---
+
+### AGENTIC Doc (`*.md`) — The "X-Ray"
+
+**Purpose**: Technical facts for agents to execute queries and understand structure.
+
+**Mandatory Sections**:
+
+```markdown
+## 1. Schema & Grain
+**Snowflake View/Table**: `DATABASE.SCHEMA.TABLE_NAME`
+**Grain**: (e.g., 1 row per unique ticket)
+**Primary Key**: <column>
+**Business Keys**: [list]
+
+### Column Schema
+| Column | Type | Nullable | Description |
+
+## 2. Overview
+| Metric | Value | As Of |
+| Row Count | X | YYYY-MM-DD |
+| Distinct Keys | Y | YYYY-MM-DD |
+| Date Range | start to end | |
+
+## 3. Column Profile
+### Nullability
+| Column | % Null | Notes |
+
+### Categorical Distributions (Top Values)
+| Value | Count | % |
+
+## 4. Temporal Drift
+| Month | Volume | Notes |
+
+## 5. Relationships
+| Target Entity | FK Column | Cardinality | Notes |
+
+## 6. Population Status
+**Status**: Active/Deprecated/Backfilling
+**Evidence**: (e.g., "Last record from YYYY-MM-DD")
+
+## 7. Notes & Caveats
+- Technical issues (e.g., "Workaround for hashed emails")
+- Query optimization tips
+```
+
+**Tone**: Precise, data-driven, query-ready.
+
+**What NOT to include**:
+- Business justifications (use Semantic doc)
+- Long explanations of "why" (use Semantic doc)
+- Strategic implications
+
+---
+
+## 4. Validation Checklist
+
+Before marking entity documentation as complete:
+
+- [ ] **Both files exist**: `<ENTITY>_SEMANTIC.md` AND `<ENTITY>.md`
+- [ ] **Cross-references**: Each file links to the other in header
+- [ ] **Domain declared**: `> **Domain**: <DOMAIN_ID>` in both
+- [ ] **Semantic completeness**: All 9 mandatory sections present
+- [ ] **Agentic completeness**: All 7 mandatory sections present
+- [ ] **No mixing**: Semantic doc has no profiling stats, Agentic doc has no business narrative
+- [ ] **ENTITY_INDEX.yaml updated**: Entity listed with correct status
+
+---
+
+## 5. Integration with @investigate-entity
+
+The `@investigate-entity` skill MUST generate BOTH docs:
+
+**Workflow**:
+1. **Run profiling** → Gather technical facts
+2. **Debate with user** → Clarify business semantics
+3. **Generate AGENTIC doc** (`<ENTITY>.md`) from profiling
+4. **Generate SEMANTIC doc** (`<ENTITY>_SEMANTIC.md`) from debate
+5. **Link both files** in headers
+6. **Update ENTITY_INDEX.yaml**
+
+See: `.cursor/skills/investigate-entity/SKILL.md` for implementation.
+
+---
+
+## 6. Location Rules
+
+### Standard Structure (All Domain Projects)
+
+```
+<project>/
+├── _domain/
+│   └── _docs/
+│       └── reference/           ← SEMANTIC DOCS ONLY
+│           └── *_SEMANTIC.md
+├── docs/
+│   └── reference/               ← DATA DICTIONARIES ONLY
+│       └── *.md (no suffix)
+```
+
+### Domain-Specific Entities
+
+**Rule**: Entity docs MUST be split across two locations:
+
+```
+✅ CORRECT:
+  client-voice-data/
+    _domain/_docs/reference/
+      ZENDESK_TICKETS_SEMANTIC.md        ← Semantic (business context)
+    docs/reference/
+      ZENDESK_TICKETS.md                 ← Data dictionary (schema)
+
+❌ INCORRECT:
+  client-voice-data/_domain/_docs/reference/
+    ZENDESK_TICKETS.md                   ← Agentic in wrong folder!
+    ZENDESK_TICKETS_SEMANTIC.md
+
+❌ INCORRECT:
+  capim-meta-ontology/_domain/_docs/ECOSYSTEM/
+    ZENDESK_TICKETS.md  ← Should be in client-voice-data
+```
+
+### Cross-Domain Entities (ECOSYSTEM)
+
+**Rule**: Only entities that are TRULY shared (CLINICS, PATIENTS, USERS) go in ECOSYSTEM.
+
+**Criteria for ECOSYSTEM promotion**:
+- Entity is referenced by 2+ domains
+- Entity semantics are identical across domains
+- No domain "owns" the entity exclusively
+
+**Default**: Keep in domain project unless proven cross-domain.
+
+---
+
+## 7. Migration Path (Existing Docs)
+
+If you find an entity doc that violates this pattern:
+
+1. **Assess**: Does it mix semantic + agentic?
+2. **Split**: Create two files following templates
+3. **Extract**: Move business content → `*_SEMANTIC.md`, technical → `*.md`
+4. **Link**: Add cross-references
+5. **Archive**: Move old file to `_archive/` with note
+
+**DO NOT delete** old docs immediately. Keep for reference during transition.
+
+---
+
+## 8. Anti-Patterns
+
+❌ **Don't**:
+- Create only ONE doc per entity (missing the pair)
+- Mix business narrative with profiling stats in same file
+- Use non-standard naming (e.g., `*_BUSINESS.md`, `*_TECHNICAL.md`)
+- Skip cross-references
+- Document domain entities in ECOSYSTEM folder
+- Create docs without actual data validation (Zero Assumptions violation)
+
+✅ **Do**:
+- Always create BOTH docs
+- Keep semantic and agentic concerns separated
+- Use standard naming convention
+- Link files bidirectionally
+- Place docs in correct domain folder
+- Validate against actual data before documenting
+
+---
+
+## 9. Rationale (Why This Pattern?)
+
+**Problem**: Single-file docs get bloated and mix concerns. Agents load unnecessary context.
+
+**Solution**: Dual docs allow:
+- **Context optimization**: Load only what's needed (semantic for planning, agentic for execution)
+- **Clarity**: Clear separation of "Why" vs "How"
+- **Maintainability**: Update technical facts without touching business narrative
+- **Token efficiency**: Agents don't load 3000-line mixed docs when they only need schema
+
+**Evidence**: Pattern successfully implemented in `client-voice-data` (2026-02-02).
+
+---
+
+## 10. Enforcement
+
+**This rule is enforced via**:
+
+### 10.1. Cursor Rule (Automatic)
+
+- ✅ This rule auto-applies via globs:
+  - `**/_domain/_docs/reference/*_SEMANTIC.md` (semantic)
+  - `**/docs/reference/*.md` (data dictionary)
+- ⚠️ Cursor displays warning if pattern violated
+
+### 10.2. Skill Enforcement
+
+- ✅ `@investigate-entity` skill generates BOTH files in correct locations
+- ✅ Skill validates paths before writing
+- 📋 Checklist in `@session-end` skill (verify dual docs exist)
+
+### 10.3. Validation Script (PowerShell)
+
+```powershell
+# Run from project root to check doc pairing
+$semantics = Get-ChildItem -Path "_domain\_docs\reference" -Filter "*_SEMANTIC.md" | ForEach-Object { $_.BaseName -replace '_SEMANTIC$', '' }
+$agentics = Get-ChildItem -Path "docs\reference" -Filter "*.md" | Where-Object { $_.Name -ne "README.md" } | ForEach-Object { $_.BaseName }
+
+$semantics | ForEach-Object {
+    if ($agentics -contains $_) {
+        Write-Host "✅ $_" -ForegroundColor Green
+    } else {
+        Write-Host "❌ Missing data dictionary: docs/reference/$_.md" -ForegroundColor Red
+    }
+}
+```
+
+### 10.4. PR Review Checklist
+
+**For any PR that adds entity documentation**:
+- [ ] Semantic doc exists in `_domain/_docs/reference/<ENTITY>_SEMANTIC.md`
+- [ ] Data dictionary exists in `docs/reference/<ENTITY>.md`
+- [ ] Cross-references are correct (relative paths)
+- [ ] ENTITY_INDEX.yaml updated with both paths
+
+---
+
+## 11. Quick Reference Card
+
+| Question | Answer |
+|:---------|:-------|
+| Where does SEMANTIC go? | `_domain/_docs/reference/<ENTITY>_SEMANTIC.md` |
+| Where does Data Dictionary go? | `docs/reference/<ENTITY>.md` |
+| What suffix for SEMANTIC? | `*_SEMANTIC.md` |
+| What suffix for Data Dictionary? | None (just `<ENTITY>.md`) |
+| Who generates both? | `@investigate-entity` skill |
+| How to validate? | Run validation script above |
+
+---
+
+## References
+
+- **Origin**: `_memory/SESSION_NOTES/2026-02-02.md` § "Map vs X-Ray"
+- **Decision**: Standardized 2026-02-05 (split folders)
+- **Implementation**: `.cursor/skills/investigate-entity/SKILL.md`
+- **Examples**:
+  - `bnpl-funil/docs/reference/CREDIT_SIMULATIONS.md` + `_domain/_docs/reference/CREDIT_SIMULATIONS_SEMANTIC.md`
+  - `client-voice-data/docs/reference/ZENDESK_TICKETS.md` + `_domain/_docs/reference/ZENDESK_TICKETS_SEMANTIC.md`

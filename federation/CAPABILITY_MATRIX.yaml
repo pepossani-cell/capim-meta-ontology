@@ -1,0 +1,364 @@
+# CAPABILITY_MATRIX.yaml
+# Machine-readable contract of what each domain can answer
+# Reference: MEMORY_ARCHITECTURE_CONSTITUTION §DIRECTIVE:CAPABILITY_ROUTING
+# Last Updated: 2026-01-31
+
+domains:
+
+  # === FINTECH DOMAIN ===
+  
+  - id: FINTECH
+    name: "BNPL Risk & Credit Domain"
+    entry_point: "bnpl-funil/_domain/START_HERE.md"
+    priority_intents: [risk, credit, conversion, bureau, simulation, rejection]
+    
+    capabilities:
+    
+      - name: RiskProfile
+        description: "Returns risk assessment for a borrower or clinic."
+        inputs:
+          - name: clinic_id
+            type: NUMBER
+            required: false
+          - name: cpf
+            type: STRING
+            required: false
+          - name: c1_entity_id
+            type: NUMBER
+            required: false
+        outputs:
+          - name: risk_score
+            type: NUMBER
+          - name: rejection_reasons
+            type: ARRAY
+          - name: bureau_summary
+            type: OBJECT
+        prerequisites:
+          - "At least one of (clinic_id, cpf, c1_entity_id) must be provided."
+        limitations:
+          - "SCR data may be unavailable for simulations after 2025-09."
+          - "Legacy PRE_ANALYSIS has lower bureau coverage than new CREDIT_SIMULATION."
+        example_queries:
+          - "What is the risk profile of clinic 12345?"
+          - "Show me the credit history for CPF 123.456.789-00"
+          - "Why was simulation 98765 rejected?"
+
+      - name: ConversionFunnel
+        description: "Analyzes C1 to C2 conversion metrics."
+        inputs:
+          - name: clinic_id
+            type: NUMBER
+            required: false
+          - name: date_range
+            type: DATE_RANGE
+            required: true
+        outputs:
+          - name: c1_count
+            type: NUMBER
+          - name: c2_count
+            type: NUMBER
+          - name: conversion_rate
+            type: FLOAT
+          - name: avg_conversion_days
+            type: FLOAT
+        limitations:
+          - "Orphan requests (no C1) are excluded from conversion calculation."
+        example_queries:
+          - "What is the C1 to C2 conversion rate for clinic 12345 in January 2026?"
+          - "How long does it take for simulations to convert to requests?"
+
+      - name: RejectionReasons
+        description: "Aggregates and ranks rejection reasons for simulations."
+        inputs:
+          - name: clinic_id
+            type: NUMBER
+            required: false
+          - name: date_range
+            type: DATE_RANGE
+            required: true
+        outputs:
+          - name: rejection_distribution
+            type: OBJECT
+          - name: top_reasons
+            type: ARRAY
+        limitations:
+          - "Rejection reasons may be generic (e.g., 'Negative Data') without specifics."
+        example_queries:
+          - "What are the main rejection reasons for clinic 12345?"
+          - "Why are simulations being rejected this month?"
+
+      - name: RejectionRate
+        description: "Calculates rejection rate over time."
+        inputs:
+          - name: clinic_id
+            type: NUMBER
+            required: true
+          - name: date_range
+            type: DATE_RANGE
+            required: true
+        outputs:
+          - name: rejection_rate
+            type: FLOAT
+          - name: trend
+            type: FLOAT
+        example_queries:
+          - "What is the rejection rate trend for clinic 12345?"
+
+  # === SAAS DOMAIN ===
+  
+  - id: SAAS
+    name: "Clinic Operations Domain"
+    entry_point: "ontologia-cf/_domain/START_HERE.md"
+    priority_intents: [schedule, appointment, churn, subscription, activity, budget]
+    
+    capabilities:
+    
+      - name: ScheduleVolume
+        description: "Returns appointment metrics for a clinic."
+        inputs:
+          - name: clinic_id
+            type: NUMBER
+            required: true
+          - name: date_range
+            type: DATE_RANGE
+            required: true
+        outputs:
+          - name: appointment_count
+            type: NUMBER
+          - name: cancellation_rate
+            type: FLOAT
+          - name: no_show_rate
+            type: FLOAT
+        example_queries:
+          - "How many appointments did clinic 12345 have last month?"
+          - "What is the cancellation rate for this clinic?"
+
+      - name: ChurnRisk
+        description: "Assesses likelihood of SaaS churn for a clinic."
+        inputs:
+          - name: clinic_id
+            type: NUMBER
+            required: true
+        outputs:
+          - name: churn_probability
+            type: FLOAT
+          - name: days_since_last_activity
+            type: NUMBER
+          - name: warning_signals
+            type: ARRAY
+        example_queries:
+          - "Is clinic 12345 at risk of churning?"
+          - "Which clinics are inactive?"
+
+      - name: SupportTickets
+        description: "Returns support ticket history for a clinic."
+        inputs:
+          - name: clinic_id
+            type: NUMBER
+            required: true
+          - name: date_range
+            type: DATE_RANGE
+            required: true
+        outputs:
+          - name: ticket_count
+            type: NUMBER
+          - name: ticket_categories
+            type: OBJECT
+          - name: avg_resolution_time
+            type: FLOAT
+        limitations:
+          - "Ticket content may be summarized; full text requires CLIENT_VOICE domain."
+        example_queries:
+          - "How many support tickets did clinic 12345 open?"
+          - "What are the common support issues?"
+
+      - name: ActivityTrend
+        description: "Calculates activity trend over time."
+        inputs:
+          - name: clinic_id
+            type: NUMBER
+            required: true
+          - name: date_range
+            type: DATE_RANGE
+            required: true
+        outputs:
+          - name: activity_by_week
+            type: ARRAY
+          - name: trend_direction
+            type: STRING
+          - name: trend_magnitude
+            type: FLOAT
+        example_queries:
+          - "Is clinic activity increasing or decreasing?"
+
+  # === CLIENT_VOICE DOMAIN ===
+  
+  - id: CLIENT_VOICE
+    name: "Customer Voice & Support Intelligence"
+    entry_point: "client-voice/START_HERE.md"
+    priority_intents: [feedback, complaint, sentiment, support_detail, ticket, voc]
+    status: ACTIVE
+    
+    capabilities:
+    
+      - name: TicketVolume
+        description: "Count tickets by period with trend analysis."
+        inputs:
+          - name: clinic_id
+            type: NUMBER
+            required: false
+          - name: date_range
+            type: DATE_RANGE
+            required: true
+        outputs:
+          - name: ticket_count
+            type: NUMBER
+          - name: trend_direction
+            type: STRING
+          - name: trend_percentage
+            type: FLOAT
+        example_queries:
+          - "How many tickets did clinic 12345 open last month?"
+          - "Is ticket volume increasing or decreasing?"
+
+      - name: TicketCategories
+        description: "Distribution of tickets by category and subcategory."
+        inputs:
+          - name: clinic_id
+            type: NUMBER
+            required: false
+          - name: date_range
+            type: DATE_RANGE
+            required: true
+        outputs:
+          - name: category_counts
+            type: OBJECT
+          - name: top_categories
+            type: ARRAY
+        example_queries:
+          - "What are the main support issues for clinic 12345?"
+          - "Show ticket distribution by category"
+
+      - name: SentimentAnalysis
+        description: "Sentiment score distribution and trends."
+        inputs:
+          - name: clinic_id
+            type: NUMBER
+            required: false
+          - name: date_range
+            type: DATE_RANGE
+            required: true
+        outputs:
+          - name: avg_sentiment
+            type: FLOAT
+          - name: sentiment_distribution
+            type: OBJECT
+          - name: trend
+            type: STRING
+        example_queries:
+          - "What is the average sentiment for clinic 12345?"
+          - "Are customers happier or angrier this month?"
+
+      - name: TicketDetails
+        description: "Returns detailed ticket content and sentiment analysis."
+        inputs:
+          - name: ticket_id
+            type: STRING
+            required: false
+          - name: clinic_id
+            type: NUMBER
+            required: false
+        outputs:
+          - name: ticket_summary
+            type: STRING
+          - name: category
+            type: STRING
+          - name: subcategory
+            type: STRING
+          - name: sentiment_score
+            type: NUMBER
+          - name: quote
+            type: STRING
+        limitations:
+          - "Requires access to raw ticket data (PII considerations)."
+        example_queries:
+          - "What was the complaint in ticket ABC123?"
+          - "Show me the details of recent tickets for clinic 12345"
+
+      - name: ClinicHealthSignals
+        description: "Aggregate support health metrics for a clinic."
+        inputs:
+          - name: clinic_id
+            type: NUMBER
+            required: true
+        outputs:
+          - name: ticket_count_90d
+            type: NUMBER
+          - name: avg_sentiment
+            type: FLOAT
+          - name: top_issues
+            type: ARRAY
+          - name: health_status
+            type: STRING
+        example_queries:
+          - "What are the support health signals for clinic 12345?"
+          - "Is this clinic having support problems?"
+
+
+# === ROUTING CONFIGURATION ===
+
+routing:
+  default_priority_order: [FINTECH, SAAS, CLIENT_VOICE]
+  
+  intent_overrides:
+    # FINTECH intents
+    risk: FINTECH
+    credit: FINTECH
+    score: FINTECH
+    rejection: FINTECH
+    simulation: FINTECH
+    bureau: FINTECH
+    conversion: FINTECH
+    
+    # SAAS intents
+    schedule: SAAS
+    appointment: SAAS
+    churn: SAAS
+    subscription: SAAS
+    activity: SAAS
+    budget: SAAS
+    
+    # CLIENT_VOICE intents
+    ticket: CLIENT_VOICE
+    complaint: CLIENT_VOICE
+    feedback: CLIENT_VOICE
+    sentiment: CLIENT_VOICE
+    support: CLIENT_VOICE
+    voc: CLIENT_VOICE
+  
+  multi_domain_triggers:
+    - pattern: "problems with clinic"
+      domains: [SAAS, FINTECH, CLIENT_VOICE]
+      rule: RULE-CROSS-001
+      description: "Comprehensive clinic health check across all domains"
+    
+    - pattern: "clinic health"
+      domains: [SAAS, FINTECH, CLIENT_VOICE]
+      rule: RULE-CROSS-001
+      description: "Full health diagnostic including support signals"
+    
+    - pattern: "why is conversion low"
+      domains: [FINTECH, SAAS]
+      rule: RULE-CROSS-002
+      description: "Conversion analysis with operational context"
+    
+    - pattern: "customer complaints"
+      domains: [CLIENT_VOICE, SAAS]
+      rule: null
+      description: "Complaint analysis with clinic context"
+    
+    - pattern: "support issues"
+      domains: [CLIENT_VOICE, SAAS]
+      rule: null
+      description: "Support ticket analysis with operational data"
+

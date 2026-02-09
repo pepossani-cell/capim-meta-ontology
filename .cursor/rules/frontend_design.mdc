@@ -1,0 +1,19 @@
+---
+description: Rules for Frontend and UI development (Streamlit/Web)
+globs: ["**/*.py", "**/*.js", "**/*.ts", "**/*.tsx"]
+---
+
+# UI & Frontend Aesthetics (Web App Development)
+
+## 1. Design Philosophy
+- **Rich Aesthetics**: Use vibrant colors, glassmorphism, and modern typography.
+- **Visual Excellence**: Avoid default Bootstrap/Streamlit looks. Use custom CSS injection where possible.
+- **Dynamic**: Implement hover effects and smooth transitions.
+
+## 2. Technology Stack
+- **Core**: Python (Streamlit) or Next.js (if requested).
+- **Styling**: Vanilla CSS for flexibility. Avoid Tailwind unless requested.
+
+## 3. Workflow
+- Plan -> Foundation (CSS) -> Components -> Pages -> Polish.
+- Always check for mobile responsiveness.

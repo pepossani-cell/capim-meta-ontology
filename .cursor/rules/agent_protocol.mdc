@@ -1,0 +1,19 @@
+---
+description: Rules for Agent Skills and Workflows
+globs: [".agent/**/*.md", "scripts/**/*.py"]
+---
+
+# Agent & Workflow Protocol
+
+## 1. Workflow Execution
+- Workflows are stored in `.agent/workflows/`.
+- Steps marked with `// turbo` can be auto-executed.
+- Always ask for confirmation on destructive steps unless marked `SafeToAutoRun`.
+
+## 2. Skill Usage
+- Skills in `.agent/skills/` extend capabilities.
+- Before using a skill, read its `SKILL.md` to understand inputs/outputs.
+- Prefer creating reusable python scripts in `scripts/` over one-off shell commands.
+
+## 3. Context Awareness
+- When running a workflow, load the relevant `ONTOLOGY_INDEX_*.yaml` into context to understand domain boundaries.
