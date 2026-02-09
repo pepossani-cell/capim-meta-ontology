@@ -4,3 +4,8 @@ _scratch/
 .env
 .env.*
 
+# python caches
+__pycache__/
+*.py[cod]
+*$py.class
+
