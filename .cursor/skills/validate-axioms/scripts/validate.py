@@ -29,6 +29,8 @@ def validate_all_axioms(axioms: list) -> dict:
     """Validate all axioms and return results."""
     results = {
         'pass': [],
+        'warn': [],
+        'info': [],
         'fail': [],
         'error': [],
         'skip': []
@@ -37,6 +39,7 @@ def validate_all_axioms(axioms: list) -> dict:
     for axiom in axioms:
         axiom_id = axiom.get('id', 'UNKNOWN')
         validation_query = axiom.get('validation_query')
+        severity = (axiom.get('severity') or '').upper()
         
         if not validation_query:
             results['skip'].append({
@@ -44,15 +47,37 @@ def validate_all_axioms(axioms: list) -> dict:
                 'reason': 'No validation_query defined'
             })
             continue
-        
-        result = validate_axiom(axiom_id, validation_query)
-        
-        if result['status'] == 'PASS':
-            results['pass'].append(result)
-        elif result['status'] == 'FAIL':
-            results['fail'].append(result)
+
+        # Execute query and interpret first cell as "violations count"
+        try:
+            df = run_query(validation_query)
+            if df is None or df.empty:
+                count = 0
+            else:
+                count = df.iloc[0, 0]
+                if count is None:
+                    count = 0
+                count = int(count)
+        except Exception as e:
+            results['error'].append({
+                'axiom_id': axiom_id,
+                'status': 'ERROR',
+                'count': -1,
+                'message': f"Failed to execute query: {e}"
+            })
+            continue
+
+        # Classify based on severity
+        if count == 0:
+            results['pass'].append({'axiom_id': axiom_id, 'status': 'PASS', 'count': 0, 'severity': severity})
         else:
-            results['error'].append(result)
+            if severity == 'HARD':
+                results['fail'].append({'axiom_id': axiom_id, 'status': 'FAIL', 'count': count, 'severity': severity})
+            elif severity == 'TEMPORAL':
+                results['info'].append({'axiom_id': axiom_id, 'status': 'INFO', 'count': count, 'severity': severity})
+            else:
+                # Default: SOFT and unknown severities are treated as warnings
+                results['warn'].append({'axiom_id': axiom_id, 'status': 'WARN', 'count': count, 'severity': severity or 'SOFT'})
     
     return results
 
@@ -67,6 +92,14 @@ def print_report(results: dict):
     # Print PASS
     for r in results['pass']:
         print(f"[PASS] {r['axiom_id']}: {r['count']} violations")
+
+    # Print WARN
+    for r in results['warn']:
+        print(f"[WARN] {r['axiom_id']}: {r['count']} violations (severity={r.get('severity')})")
+
+    # Print INFO
+    for r in results['info']:
+        print(f"[INFO] {r['axiom_id']}: {r['count']} (severity={r.get('severity')})")
     
     # Print FAIL
     for r in results['fail']:
@@ -81,10 +114,21 @@ def print_report(results: dict):
         print(f"[SKIP] {r['axiom_id']}: {r['reason']}")
     
     # Summary
-    total = len(results['pass']) + len(results['fail']) + len(results['error']) + len(results['skip'])
-    print(f"\nSummary: {len(results['pass'])} PASS, {len(results['fail'])} FAIL, {len(results['error'])} ERROR, {len(results['skip'])} SKIP")
+    total = (
+        len(results['pass'])
+        + len(results['warn'])
+        + len(results['info'])
+        + len(results['fail'])
+        + len(results['error'])
+        + len(results['skip'])
+    )
+    print(
+        f"\nSummary: {len(results['pass'])} PASS, {len(results['warn'])} WARN, {len(results['info'])} INFO, "
+        f"{len(results['fail'])} FAIL, {len(results['error'])} ERROR, {len(results['skip'])} SKIP"
+    )
     print("=" * 50)
     
+    # Only HARD failures and execution errors should fail the process
     return len(results['fail']) == 0 and len(results['error']) == 0
 
 

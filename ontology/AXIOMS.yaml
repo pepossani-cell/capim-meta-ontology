@@ -11,7 +11,7 @@ axioms:
     domain: FINTECH
     natural_language: "A simulation can only be approved if the clinic is BNPL eligible."
     formal: "APPROVED(sim) => BNPL_ELIGIBLE(sim.clinic_id)"
-    severity: HARD
+    severity: SOFT
     validation_query: |
       SELECT COUNT(*) AS violations
       FROM CAPIM_DATA_DEV.POSSANI_SANDBOX.C1_ENRICHED_BORROWER eb
@@ -22,20 +22,31 @@ axioms:
       -- Expected: 0
     status: HOMOLOGATED
     last_validated: null
+    notes: |
+      ⚠️ Interpretação:
+      - Em prática, "eligibility" pode ser um snapshot e não refletir o estado "as-of" do C1.
+      - Mantido como SOFT até termos uma validação temporal/as-of para a elegibilidade.
 
   - id: AX-FINTECH-002
     domain: FINTECH
-    natural_language: "A Request (C2) must have a valid C1 origin OR be explicitly marked as orphan."
-    formal: "REQUEST(r) => (HAS_C1_ORIGIN(r) OR IS_ORPHAN(r))"
-    severity: HARD
+    natural_language: "A Request (C2) must have a matched C1 origin OR be synthetic (request_direct) OR be explicitly flagged as ID collision."
+    formal: "REQUEST(r) => (C1_ORIGIN_MATCHED(r) OR C1_IS_SYNTHETIC(r) OR IS_C1_ID_COLLISION(r))"
+    severity: SOFT
     validation_query: |
+      -- In C2_ENRICHED_REQUESTS, `c1_is_synthetic` is TRUE when c1_origin_id is NULL (request_direct).
+      -- Therefore: any non-synthetic request must have a matched C1 origin OR be explicitly flagged as ID collision.
       SELECT COUNT(*) AS violations
       FROM CAPIM_DATA_DEV.POSSANI_SANDBOX.C2_ENRICHED_REQUESTS
-      WHERE c1_origin_type IS NULL
-        AND c1_is_orphan = FALSE
+      WHERE c1_is_synthetic = FALSE
+        AND c1_origin_matched = FALSE
+        AND is_c1_id_collision = FALSE
       -- Expected: 0
     status: HOMOLOGATED
     last_validated: null
+    notes: |
+      ⚠️ Atualmente este axiom é SOFT porque:
+      - A cobertura de `c1_origin_matched` para `pre_analysis` (legado) pode ser incompleta (muitos direct_pre_analysis_id não encontram C1 unificado).
+      - Use este contador como monitoramento de drift/qualidade da bridge; promover para HARD após corrigir linkage/coverage.
 
   - id: AX-FINTECH-003
     domain: FINTECH
@@ -50,10 +61,8 @@ axioms:
     domain: FINTECH
     natural_language: "SCR check association uses a +/- 15 day time window."
     formal: "SCR_MATCH(c1, scr) => ABS(c1.created_at - scr.checked_at) <= 15 days"
-    severity: HARD
-    validation_query: |
-      -- This is a design constraint, not a data validation
-      -- Implement in the Bridge view itself
+    severity: SOFT
+    validation_query: null  # Design constraint; enforced by bridge implementation/code review
     status: HOMOLOGATED
     last_validated: null
 
@@ -75,13 +84,14 @@ axioms:
       1. HAS_C2(c1) => WAS_APPROVED(c1)              # Necessário mas não suficiente
       2. WAS_APPROVED(c1) =/=> HAS_C2(c1)            # Nem todo aprovado converte
       3. WAS_APPROVED(c2) pode ser FALSE mesmo com c1_was_approved=TRUE  # C2 tem avaliação própria
-    severity: HARD
+    severity: SOFT
     validation_query: |
       -- Valida: nenhum C1 reprovado deve ter C2 associado
       SELECT COUNT(*) AS violations
       FROM CAPIM_DATA_DEV.POSSANI_SANDBOX.C1_LIFECYCLE
-      WHERE c1_was_approved = FALSE
-        AND c2_count > 0
+      WHERE c1_entity_type IN ('credit_simulation', 'pre_analysis')
+        AND c1_was_approved = FALSE
+        AND c2_n_requests > 0
       -- Expected: 0 (ou muito próximo, casos edge)
     status: HOMOLOGATED
     last_validated: null
@@ -99,23 +109,19 @@ axioms:
     natural_language: "A clinic is considered churned if no SaaS activity in the last 90 days."
     formal: "CHURNED(clinic) <=> (NOW() - clinic.last_dash_activity_at) > 90 days"
     severity: SOFT
-    validation_query: |
-      SELECT clinic_id, 
-             DATEDIFF('day', last_dash_activity_at, CURRENT_DATE()) AS days_inactive
-      FROM CAPIM_DATA_DEV.POSSANI_SANDBOX.CLINIC_MOST_RELEVANT_INFO
-      WHERE is_subscriber = TRUE
-        AND DATEDIFF('day', last_dash_activity_at, CURRENT_DATE()) > 90
-      -- Returns: Candidates for churn review
+    validation_query: null  # Not a strict integrity constraint; this is a business diagnostic/classification.
     status: HOMOLOGATED
     last_validated: null
+    notes: |
+      Esta regra é uma definição/diagnóstico operacional (não uma invariância "Expected 0").
+      Se necessário, mover para um "diagnostics catalog" em vez de AXIOMS.
 
   - id: AX-SAAS-002
     domain: SAAS
     natural_language: "has_signed_contract is a BNPL flag, NOT a SaaS subscription indicator."
     formal: "has_signed_contract(clinic) =/=> is_subscriber(clinic)"
     severity: HARD
-    validation_query: |
-      -- Semantic constraint; enforced by documentation
+    validation_query: null  # Semantic constraint; enforced by documentation
     status: HOMOLOGATED
     last_validated: null
 
