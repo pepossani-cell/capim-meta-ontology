@@ -147,3 +147,55 @@ axioms:
     validation_query: null  # Design constraint
     status: DRAFT
     last_validated: null
+
+  - id: AX-CROSS-004
+    domain: CROSS
+    natural_language: "ECOSYSTEM.CLINICS must have non-null clinic_id in canonical sources (analytics + sandbox mirror)."
+    formal: "∀ clinic ∈ ECOSYSTEM.CLINICS: clinic.clinic_id IS NOT NULL"
+    severity: HARD
+    validation_query: |
+      -- Validates the canonical minimum contract join key for clinics.
+      -- Expected: 0
+      WITH violations AS (
+        SELECT 'CAPIM_DATA.CAPIM_ANALYTICS.CLINICS' AS source_name, COUNT(*) AS v
+        FROM CAPIM_DATA.CAPIM_ANALYTICS.CLINICS
+        WHERE clinic_id IS NULL
+        UNION ALL
+        SELECT 'CAPIM_DATA_DEV.POSSANI_SANDBOX.CLINIC_DIM_V1' AS source_name, COUNT(*) AS v
+        FROM CAPIM_DATA_DEV.POSSANI_SANDBOX.CLINIC_DIM_V1
+        WHERE clinic_id IS NULL
+      )
+      SELECT SUM(v) AS violations
+      FROM violations;
+    status: DRAFT
+    last_validated: null
+    notes: |
+      Governança (Opção B estrita):
+      - ECOSYSTEM.CLINICS é SAAS-owned (contrato canônico mínimo)
+      - A validação roda em duas tabelas para reduzir risco de drift entre analytics e mirror sandbox
+
+  - id: AX-CROSS-005
+    domain: CROSS
+    natural_language: "ECOSYSTEM.CLINICS must have unique clinic_id (no duplicates) in canonical sources (analytics + sandbox mirror)."
+    formal: "∀ clinic_id: COUNT(clinic_id) = 1"
+    severity: HARD
+    validation_query: |
+      -- Validates grain/PK integrity for clinic_id.
+      -- Expected: 0
+      WITH dup_analytics AS (
+        SELECT clinic_id
+        FROM CAPIM_DATA.CAPIM_ANALYTICS.CLINICS
+        GROUP BY 1
+        HAVING COUNT(*) > 1
+      ),
+      dup_sandbox AS (
+        SELECT clinic_id
+        FROM CAPIM_DATA_DEV.POSSANI_SANDBOX.CLINIC_DIM_V1
+        GROUP BY 1
+        HAVING COUNT(*) > 1
+      )
+      SELECT
+        (SELECT COUNT(*) FROM dup_analytics)
+        + (SELECT COUNT(*) FROM dup_sandbox) AS violations;
+    status: DRAFT
+    last_validated: null

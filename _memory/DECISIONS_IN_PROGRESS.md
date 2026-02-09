@@ -235,6 +235,7 @@ when t.tags like ('%horario_atendimento_ccc%') then 'horario_atendimento_ccc'
 | ID | Topic | Status | Decision | Notes |
 | :--- | :--- | :--- | :--- | :--- |
 | 18.1 | Governança de `ECOSYSTEM.CLINICS` | ✅➡️ Executed | **Opção B (estrita)**: contrato canônico mínimo é **SAAS-owned**; FINTECH documenta apenas projeções locais (`FINTECH.CLINICS.*`) | Reduz acoplamento semântico e mantém autonomia. `ECOSYSTEM.CLINICS` deve conter apenas invariantes + join key (`clinic_id`) + caveats cross-domain. |
+| 18.2 | Axiomas mínimos de `ECOSYSTEM.CLINICS` | ✅ Decided | **HARD + HARD**, validando em `CAPIM_DATA.CAPIM_ANALYTICS.CLINICS` **e** `CAPIM_DATA_DEV.POSSANI_SANDBOX.CLINIC_DIM_V1` | Regras: `clinic_id` não-nulo e único (PK/grain 1:1). Objetivo: impedir regressões silenciosas no contrato canônico. |
 
 ## 5. Workflow / Next Steps
 

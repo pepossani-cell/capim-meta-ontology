@@ -9,7 +9,9 @@ from pathlib import Path
 from datetime import datetime
 
 # Add project root to path
-project_root = Path(__file__).parent.parent.parent.parent
+# validate.py lives in: <repo>/.cursor/skills/validate-axioms/scripts/validate.py
+# so repo root is 5 levels up from this file.
+project_root = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(project_root / "src" / "utils"))
 
 import yaml
@@ -64,19 +66,19 @@ def print_report(results: dict):
     
     # Print PASS
     for r in results['pass']:
-        print(f"✅ {r['axiom_id']}: PASS ({r['count']} violations)")
+        print(f"[PASS] {r['axiom_id']}: {r['count']} violations")
     
     # Print FAIL
     for r in results['fail']:
-        print(f"❌ {r['axiom_id']}: FAIL ({r['count']} violations)")
+        print(f"[FAIL] {r['axiom_id']}: {r['count']} violations")
     
     # Print ERROR
     for r in results['error']:
-        print(f"⚠️ {r['axiom_id']}: ERROR ({r['message']})")
+        print(f"[ERROR] {r['axiom_id']}: {r['message']}")
     
     # Print SKIP
     for r in results['skip']:
-        print(f"⏭️ {r['axiom_id']}: SKIP ({r['reason']})")
+        print(f"[SKIP] {r['axiom_id']}: {r['reason']}")
     
     # Summary
     total = len(results['pass']) + len(results['fail']) + len(results['error']) + len(results['skip'])
