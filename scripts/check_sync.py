@@ -1,6 +1,7 @@
 import psycopg2
 from dotenv import load_dotenv
 import os
+import sys
 
 load_dotenv()
 
@@ -106,6 +107,44 @@ def check():
                 print(f"   - {qualified_name} | DomainSrc: {source_domain} | Domains: {domains} | Tier: {tier} | Status: {status}")
                 print(f"     semantic_path: {sem_path or '<empty>'}")
                 print(f"     agentic_path:  {age_path or '<empty>'}")
+
+    # --- Governance checks (strict) ---
+    # Ensure ECOSYSTEM.CLINICS is SAAS-owned (canonical minimum contract).
+    cursor.execute(
+        """
+        SELECT
+          qualified_name,
+          COALESCE(metadata->>'source_domain', '') AS source_domain,
+          COALESCE(metadata->'original_paths'->>'semantic', '') AS semantic_path,
+          COALESCE(metadata->'original_paths'->>'agentic', '') AS agentic_path
+        FROM public.ontology_entities
+        WHERE qualified_name = 'ECOSYSTEM.CLINICS';
+        """
+    )
+    row = cursor.fetchone()
+    governance_violations = []
+
+    if row is None:
+        governance_violations.append("ECOSYSTEM.CLINICS não encontrado em public.ontology_entities.")
+    else:
+        qualified_name, source_domain, sem_path, age_path = row
+        if source_domain != "SAAS":
+            governance_violations.append(
+                "Governança violada: ECOSYSTEM.CLINICS deve ser SAAS-owned, "
+                f"mas metadata.source_domain={source_domain!r}. "
+                f"(semantic_path={sem_path!r}, agentic_path={age_path!r})"
+            )
+
+    if governance_violations:
+        print("[CHECK] ERRO: violações de governança detectadas:")
+        for msg in governance_violations:
+            print(f"   - {msg}")
+        cursor.close()
+        conn.close()
+        sys.exit(1)
+    else:
+        print("[CHECK] OK: governança ECOSYSTEM.CLINICS (SAAS-owned) verificada.")
+
     cursor.close()
     conn.close()
 
